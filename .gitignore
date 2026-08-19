@@ -1,0 +1,11 @@
+﻿.venv/
+__pycache__/
+*.part
+
+# ~1.5 GB of PL 94-171 zips. Re-fetch with scripts/fetch_all.py; the loader
+# verifies each state against its published total, so a re-download is checked.
+data/raw/
+
+# Regenerated in ~1 min by scripts/export_gis.py, and the combined file plus the
+# per-state files are the same data twice. Kept local.
+data/gis/

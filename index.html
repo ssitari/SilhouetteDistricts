@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Congressional districts as nested silhouettes</title>
+<style>
+  :root {
+    --surface: #fff;
+    --ink: #1a1a1a;
+    --ink-muted: #6b7280;
+    --rule: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface);
+    color: var(--ink);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 1180px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+
+  h1 { font-size: 1.7rem; line-height: 1.25; margin: 0 0 .6rem; font-weight: 650; letter-spacing: -.01em; }
+  .subtitle { margin: 0 0 1.5rem; max-width: 62ch; color: var(--ink-muted); }
+  .explainer { max-width: 62ch; margin: 0 0 .5rem; }
+  .caveat { max-width: 62ch; margin: 0 0 1.75rem; color: var(--ink-muted); font-size: .9rem; }
+
+  .stats { display: flex; flex-wrap: wrap; gap: 2rem; margin: 0 0 1.75rem; padding: 0; list-style: none; }
+  .stats div { font-variant-numeric: tabular-nums; }
+  .stats .n { font-size: 1.45rem; font-weight: 650; display: block; line-height: 1.15; }
+  .stats .k { font-size: .78rem; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .05em; }
+
+  #figure { position: relative; }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  use { cursor: crosshair; }
+
+  #tooltip {
+    position: absolute; pointer-events: none; opacity: 0;
+    transition: opacity .1s; background: #fff; color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.10);
+    padding: .55rem .7rem; font-size: .82rem; line-height: 1.45;
+    max-width: 15rem; z-index: 5;
+  }
+  #tooltip .t-state { font-weight: 650; }
+  #tooltip .t-row { display: flex; justify-content: space-between; gap: 1.25rem; }
+  #tooltip .t-row span:last-child { font-variant-numeric: tabular-nums; }
+  #tooltip .t-note { color: var(--ink-muted); margin-top: .3rem; }
+
+  footer {
+    margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--rule);
+    font-size: .82rem; color: var(--ink-muted);
+  }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 1rem; }
+  .controls label { display: flex; align-items: center; gap: .45rem; font-size: .85rem; }
+  .controls select {
+    font: inherit; font-size: .85rem; color: var(--ink); background: #fff;
+    border: 1px solid var(--rule); border-radius: 5px; padding: .2rem .4rem;
+  }
+  footer a { color: inherit; }
+  #credit { max-width: 74ch; }
+
+  #legend {
+    display: flex; flex-wrap: wrap; gap: 1.75rem; align-items: center;
+    margin: 0 0 1.25rem; padding: .75rem .9rem;
+    border: 1px solid var(--rule); border-radius: 7px; font-size: .82rem;
+  }
+  #legend .item { display: flex; align-items: center; gap: .55rem; }
+  #legend .item { flex: 1 1 16rem; }
+  #legend .item span { line-height: 1.35; }
+  /* Override the full-bleed rule above: these swatches are fixed-size icons,
+     not the chart. Without this they inflate to the container width. */
+  #legend svg { display: block; flex: none; width: 44px; height: 44px; }
+
+  table.districts { border-collapse: collapse; width: 100%; font-size: .8rem; margin-top: 1rem; }
+  table.districts th, table.districts td { text-align: right; padding: .25rem .5rem; border-bottom: 1px solid var(--rule); }
+  table.districts th:first-child, table.districts td:first-child { text-align: left; }
+  table.districts td { font-variant-numeric: tabular-nums; }
+  details { margin-top: 1.5rem; }
+  summary { cursor: pointer; font-size: .85rem; color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title"></h1>
+  <p class="subtitle" id="subtitle"></p>
+  <ul class="stats" id="stats"></ul>
+  <p class="explainer" id="explainer"></p>
+  <p class="caveat" id="caveat"></p>
+
+  <div id="legend"></div>
+
+  <div id="figure">
+    <div id="chart"></div>
+    <div id="tooltip" role="status" aria-live="polite"></div>
+  </div>
+
+  <details id="table-wrap">
+    <summary>District table (accessible view)</summary>
+    <div id="table"></div>
+  </details>
+
+  <footer>
+    <div class="controls">
+      <label>View
+        <select id="view">
+          <option value="map">National map</option>
+          <option value="grid">All states, sorted by lopsidedness</option>
+        </select>
+      </label>
+      <label>Colour
+        <select id="color">
+          <option value="alternating">Alternating (count the districts)</option>
+          <option value="density">Population density</option>
+        </select>
+      </label>
+    </div>
+    <div id="credit"></div>
+  </footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
