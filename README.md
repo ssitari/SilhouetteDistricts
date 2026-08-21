@@ -63,6 +63,17 @@ actually be read state by state, sorted by how lopsided each state is:
 | `meridian` | a line of constant longitude | east to west | 313/435 (72%) | 10 | **0.189%** |
 | `parallel` | a line of constant latitude | south to north | 322/435 (74%) | 10 | 0.382% |
 
+![All four models at national scale](docs/national_four_models.png)
+
+Colours cycle every five districts and carry no meaning — they only keep
+neighbours apart. Because the palette is cyclic, only *adjacent* separation
+matters, which makes the hue order a real decision: reordering to
+tan → green → blue → yellow → cyan roughly doubles the worst adjacent pair
+(fills ΔE 3.3 → 6.3, strokes 8.2 → 14.4). The pale fills carry mass and the
+darker strokes, all clearing 3:1 against the surface, carry the boundaries.
+
+Per state, the same four:
+
 ![The four models compared across five states](docs/four_models.png)
 
 The surprise is that **erosion beats both stripe models on contiguity.** Axis
