@@ -1,0 +1,1 @@
+{"usps": "WV", "state": "West Virginia", "seats": 2, "mode": "meridian", "population": 1793716, "crs": "EPSG:5070", "cuts_lon": [-80.859139], "district_pop": [896856, 896860], "district_area_km2": [35259.5, 27493.2], "district_density": [25.4, 32.6], "district_pieces": [2, 2], "_max_dev": 2.2300074259247283e-06, "_overlap_frac": 0.0, "_coverage": 1.0000006865001416, "_empty": []}

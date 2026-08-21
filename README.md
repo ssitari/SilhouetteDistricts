@@ -9,6 +9,10 @@ census population.
 A geometric thought experiment, not a redistricting proposal — and, it turns
 out, one where only 115 of the 435 districts are a single connected piece.
 
+Since then it has grown a second half. There are now **four** ways of walking
+across a state while handing out equal shares of its population, run over the
+same 2020 census blocks with the same checks.
+
 ![All 435 districts drawn as nested state silhouettes](docs/national.png)
 
 ---
@@ -50,7 +54,61 @@ actually be read state by state, sorted by how lopsided each state is:
 
 ![Every state's districts as small multiples, sorted by ring ratio](docs/grid.png)
 
-## Method
+## The four models
+
+| model | boundary | numbered from | contiguous | max pieces | worst pop dev |
+|---|---|---|---|---|---|
+| `outward` | scaled copy of the state | centre outward | 115/435 (26%) | 100 | 0.322% |
+| `inward` | distance from the border | border inward | **344/435 (79%)** | 10 | 0.297% |
+| `meridian` | a line of constant longitude | east to west | 313/435 (72%) | 10 | **0.189%** |
+| `parallel` | a line of constant latitude | south to north | 322/435 (74%) | 10 | 0.382% |
+
+![The four models compared across five states](docs/four_models.png)
+
+The surprise is that **erosion beats both stripe models on contiguity.** Axis
+aligned slabs feel like they ought to be the well-behaved ones, but a strip
+crossing a state hits every island and peninsula on its line, while an erosion
+collar wraps the boundary and stays whole.
+
+Colorado reads the difference across all four at a glance: nested rectangles
+holding their proportions, then flattening toward a bar, then Denver's Front
+Range showing up as a tight cluster of vertical stripes or horizontal bands,
+with the plains and the mountains each swallowing one very wide district.
+
+The published site currently shows the `outward` model only.
+
+### `inward` — erosion from the border
+
+Every block is given its distance to the state boundary; sort, accumulate, cut.
+District 1 is the outermost collar and the last district is whatever core
+survives. Nesting is free here — erosion is monotone — and there is no anchor at
+all, so the centroid problem disappears.
+
+It costs the silhouette, which is the whole point of the outward model. Offsetting
+strips an equal margin from every side, so the *shorter* dimension burns off
+faster and a state flattens as it goes in. Colorado's aspect ratio holds at 1.27
+at every depth under homothety and drifts 1.27 → 1.75 under erosion.
+
+Use `join_style=round`, not mitre. Blocks are binned by Euclidean distance to the
+border, and the set of points at distance ≥ d is by definition the erosion by a
+**disk** — which is what a round join computes. Mitre is a different shape, so the
+drawn bands would not match the distance bands the population came from. It also
+collapses to empty at large offsets: Ohio's shells vanished at 120 km while its
+deepest populated block sits at 148 km.
+
+### `meridian` and `parallel` — the simple baselines
+
+Sort every block on one coordinate, accumulate, cut. No anchor, no erosion, and
+nothing to enforce: half-planes are disjoint and exhaustive, so the districts
+partition the state by construction.
+
+Cuts are made in **lon/lat**, so these are true meridians and parallels — which
+means they are slightly curved when drawn on an Albers map, and the polygons are
+segmentized at 0.02° before reprojection to keep that curve. Cutting in projected
+metres instead would give lines that look perfectly straight on screen but are
+not meridians.
+
+## Method: the `outward` model
 
 1. **Decompose** the state into *lobes* — polygon parts at or above 1% of state
    area. Most states have one. Michigan has two, Hawaii seven, and Virginia,
@@ -133,7 +191,16 @@ python scripts/bundle.py                    # merge + simplify -> data/districts
 python scripts/preview_national.py          # optional PNG check
 python scripts/fix_areas.py                 # exact ring areas (see below)
 python scripts/export_gis.py                # GeoJSON -> data/gis/
+
+# the other three models
+python scripts/build_inward.py --all --gis
+python scripts/build_stripes.py --mode meridian --all --gis
+python scripts/build_stripes.py --mode parallel --all --gis
+python scripts/preview_models.py NY MI FL CO HI
 ```
+
+`build_inward.py` and `build_stripes.py` are far cheaper than the outward solve —
+about two minutes for all fifty states each — because neither needs ray-casting.
 
 Then serve the site over HTTP — it loads ES modules and data via `fetch()`, so
 a `file://` URL will not work:
@@ -254,6 +321,8 @@ is quick.
 | `data/gis/XX_districts.geojson` | Per-state, with `--separate` |
 | `data/derived/XX_districts.json` | Per-state solution: breaks, lobes, anchors, QA |
 | `data/derived/summary.csv` | One row per state: ring ratio, density range, deviation, escape |
+| `data/gis_inward/`, `gis_meridian/`, `gis_parallel/` | The other three models as GeoJSON |
+| `data/derived_meridian/`, `derived_parallel/` | Cut longitudes / latitudes per state |
 
 ## Data sources and citations
 

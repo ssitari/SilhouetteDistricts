@@ -9,3 +9,11 @@ data/raw/
 # Regenerated in ~1 min by scripts/export_gis.py, and the combined file plus the
 # per-state files are the same data twice. Kept local.
 data/gis/
+data/gis_inward/
+data/gis_meridian/
+data/gis_parallel/
+
+# 9.3 MB of explicit shell geometry, rebuilt in ~2 min by build_inward.py.
+# The summary is small and worth keeping.
+data/derived_inward/*
+!data/derived_inward/summary_inward.csv

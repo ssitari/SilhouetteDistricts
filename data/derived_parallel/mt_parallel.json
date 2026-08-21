@@ -1,0 +1,1 @@
+{"usps": "MT", "state": "Montana", "seats": 2, "mode": "parallel", "population": 1084225, "crs": "EPSG:5070", "cuts_lat": [46.615732], "district_pop": [542110, 542115], "district_area_km2": [150314.5, 230571.8], "district_density": [3.6, 2.4], "district_pieces": [1, 1], "_max_dev": 4.611588922963407e-06, "_overlap_frac": 0.0, "_coverage": 0.9999999695162824, "_empty": []}
