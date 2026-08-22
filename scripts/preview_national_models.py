@@ -39,6 +39,7 @@ from matplotlib.patches import PathPatch, Polygon as MplPolygon
 from matplotlib.path import Path as MplPath
 from shapely import affinity
 
+import fetch_data
 from build_districts import crs_for
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -66,9 +67,54 @@ TITLES = {
 }
 
 
-def pair(k):
-    """Fill and stroke for district k (1-indexed), cycled."""
-    return FILLS[(k - 1) % 5], STROKES[(k - 1) % 5]
+def pair(k, offset=0):
+    """Fill and stroke for district k (1-indexed), cycled from a per-state offset."""
+    i = (k - 1 + offset) % 5
+    return FILLS[i], STROKES[i]
+
+
+def state_offsets(codes):
+    """
+    Where each state starts in the colour cycle.
+
+    Starting every state at slot 0 makes that one hue dominate: district 1 is
+    the same colour in all fifty states, and the six single-district states are
+    ENTIRELY that colour. Montana, Wyoming and the Dakotas are mutually adjacent,
+    so they fused into one tan mass with their shared borders invisible.
+
+    Randomising the start fixes the dominance but can still seat the same hue on
+    both sides of a border. State adjacency is a planar graph, so four colours
+    would suffice and five leave room to spare -- greedy colouring by descending
+    degree guarantees no two neighbours share an offset, and picking the
+    least-used valid slot keeps the five hues evenly worked. Deterministic, so
+    the figures are reproducible without a seed.
+
+    Note this equalises the STARTING slot, not every boundary: two neighbours
+    with different offsets can still meet at a shared hue further along their
+    cycles. No cyclic scheme can promise otherwise.
+    """
+    g = gpd.read_file(fetch_data.fetch_state_boundaries()).to_crs("EPSG:5070")
+    g = g[g["STUSPS"].isin(codes)][["STUSPS", "geometry"]].copy()
+    g["geometry"] = g.geometry.buffer(1500)  # close cartographic slivers
+    j = gpd.sjoin(g, g, predicate="intersects")
+
+    adj = {c: set() for c in codes}
+    for a, b in zip(j["STUSPS_left"], j["STUSPS_right"]):
+        if a != b:
+            adj[a].add(b)
+
+    used = [0] * 5
+    off = {}
+    for c in sorted(codes, key=lambda x: (-len(adj[x]), x)):
+        taken = {off[n] for n in adj[c] if n in off}
+        cand = [i for i in range(5) if i not in taken] or list(range(5))
+        pick = min(cand, key=lambda i: (used[i], i))
+        off[c] = pick
+        used[pick] += 1
+
+    clashes = sum(1 for c in codes for n in adj[c] if n in off and off[n] == off[c]) // 2
+    print(f"  offsets: {clashes} adjacent-state clashes, usage {used}")
+    return off
 
 
 def placed(geom, p):
@@ -94,7 +140,7 @@ def patch_for(geom, fc, ec):
                      edgecolor=ec, linewidth=LW, joinstyle="round")
 
 
-def draw_outward(ax, spec, p):
+def draw_outward(ax, spec, p, off=0):
     for lobe in spec["lobes"]:
         o = np.asarray(lobe["outline"])
         a = np.asarray(lobe["anchor"])
@@ -105,7 +151,7 @@ def draw_outward(ax, spec, p):
         # Back to front: each smaller copy covers the middle of the last, so the
         # visible band is the district and its stroke marks that band's outer edge.
         for k in range(spec["seats"], 0, -1):
-            fc, ec = pair(k)
+            fc, ec = pair(k, off)
             g = placed(shapely.Polygon(a + (o - a) * spec["breaks"][k]), p)
             pt = MplPolygon(np.asarray(g.exterior.coords), closed=True,
                             facecolor=fc, edgecolor=ec, linewidth=LW)
@@ -113,41 +159,42 @@ def draw_outward(ax, spec, p):
             pt.set_clip_path(clip)
 
 
-def draw_inward(ax, res, p):
+def draw_inward(ax, res, p, off=0):
     # Shells nest, so painting outermost first and each deeper one on top leaves
     # district k+1 visible in its own band.
     for k, shell in enumerate(res["shells"]):
-        fc, ec = pair(k + 1)
+        fc, ec = pair(k + 1, off)
         for ring in shell:
             g = placed(shapely.Polygon(ring), p)
             ax.add_patch(MplPolygon(np.asarray(g.exterior.coords), closed=True,
                                     facecolor=fc, edgecolor=ec, linewidth=LW))
 
 
-def draw_stripes(ax, usps, model, p):
+def draw_stripes(ax, usps, model, p, off=0):
     g = gpd.read_file(ROOT / f"data/gis_{model}" / f"{usps.lower()}_{model}.geojson")
     g = g.to_crs(crs_for(usps)).sort_values("district")
     for _, r in g.iterrows():
-        fc, ec = pair(int(r["district"]))
+        fc, ec = pair(int(r["district"]), off)
         patch = patch_for(placed(r.geometry, p), fc, ec)
         if patch is not None:
             ax.add_patch(patch)
 
 
-def render(ax, model, meta):
+def render(ax, model, meta, offsets):
     for f in sorted((ROOT / "data" / "derived").glob("*_districts.json")):
         usps = f.name[:2].upper()
         p = meta["placement"].get(usps)
+        off = offsets.get(usps, 0)
         if model == "outward":
-            draw_outward(ax, json.loads(f.read_text(encoding="utf-8")), p)
+            draw_outward(ax, json.loads(f.read_text(encoding="utf-8")), p, off)
         elif model == "inward":
             src = ROOT / "data/derived_inward" / f"{usps.lower()}_inward.json"
             if src.exists():
-                draw_inward(ax, json.loads(src.read_text(encoding="utf-8")), p)
+                draw_inward(ax, json.loads(src.read_text(encoding="utf-8")), p, off)
         else:
             src = ROOT / f"data/gis_{model}" / f"{usps.lower()}_{model}.geojson"
             if src.exists():
-                draw_stripes(ax, usps, model, p)
+                draw_stripes(ax, usps, model, p, off)
 
     x0, y0, x1, y1 = meta["frame_bbox"]
     ax.set_xlim(x0, x1)
@@ -169,10 +216,13 @@ def main():
     docs = ROOT / "docs"
     docs.mkdir(exist_ok=True)
 
+    codes = sorted(f.name[:2].upper() for f in (ROOT / "data" / "derived").glob("*_districts.json"))
+    offsets = state_offsets(codes)
+
     todo = [args.only] if args.only else MODELS
     for model in todo:
         fig, ax = plt.subplots(figsize=(15, 15 * aspect), dpi=args.dpi)
-        render(ax, model, meta)
+        render(ax, model, meta, offsets)
         ax.set_title(TITLES[model], fontsize=13, loc="left", color="#1a1a1a", pad=14)
         fig.text(0.01, 0.005, SUBTITLE, fontsize=9, color="#6b7280", ha="left")
         fig.tight_layout(rect=(0, 0.02, 1, 1))
@@ -184,7 +234,7 @@ def main():
     if not args.only:
         fig, axes = plt.subplots(2, 2, figsize=(24, 24 * aspect), dpi=args.dpi)
         for ax, model in zip(axes.ravel(), MODELS):
-            render(ax, model, meta)
+            render(ax, model, meta, offsets)
             ax.set_title(TITLES[model], fontsize=13, loc="left", color="#1a1a1a", pad=10)
         fig.text(0.01, 0.005, SUBTITLE, fontsize=11, color="#6b7280", ha="left")
         fig.tight_layout(rect=(0, 0.015, 1, 1))

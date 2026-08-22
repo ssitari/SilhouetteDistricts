@@ -72,6 +72,14 @@ tan → green → blue → yellow → cyan roughly doubles the worst adjacent pa
 (fills ΔE 3.3 → 6.3, strokes 8.2 → 14.4). The pale fills carry mass and the
 darker strokes, all clearing 3:1 against the surface, carry the boundaries.
 
+Each state also *starts* at a different point in the cycle. Starting them all at
+slot 0 made one hue dominate — district 1 was the same colour in all fifty
+states, and the six single-district states were entirely that colour, fusing
+Montana, Wyoming and the Dakotas into one mass with their shared borders
+invisible. State adjacency is a planar graph, so greedy colouring by descending
+degree seats no two neighbours on the same offset, with the least-used slot
+breaking ties: 0 clashes and an exactly even 10 states per slot.
+
 Per state, the same four:
 
 ![The four models compared across five states](docs/four_models.png)
