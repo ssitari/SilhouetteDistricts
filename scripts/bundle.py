@@ -40,13 +40,14 @@ SIMPLIFY_M = 300.0
 # the insets hang below CONUS rather than inside it, because at the sizes
 # geoAlbersUsa uses, an Alaska tucked into the lower left corner overlaps the
 # Southwest. The frame is widened to fit them instead.
-# Alaska is deliberately below true relative size, as on most US maps, and it is
-# a single district so there is no ring structure to lose. Hawaii is deliberately
-# ABOVE it: at a truthful scale its islands are specks, and it is the only state
-# whose districts come in seven pieces, which is worth being able to see.
+# Alaska is well below true relative size, further below it than most US maps go:
+# it is a single district under every model, so there is no structure to lose and
+# no reason to spend a quarter of the canvas on it. Hawaii stays above true scale
+# so its islands are not specks, but is pulled right to sit off Florida rather
+# than under Texas, which closes most of the dead space along the bottom.
 INSETS = {
-    "AK": {"scale_frac": 0.30, "at": (0.02, -0.25)},
-    "HI": {"scale_frac": 0.22, "at": (0.40, -0.20)},
+    "AK": {"scale_frac": 0.23, "at": (0.03, -0.15)},
+    "HI": {"scale_frac": 0.13, "at": (0.64, -0.08)},
 }
 
 
