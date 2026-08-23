@@ -148,14 +148,14 @@ FIPS = {"IL": "17"}
 
 # ---------------------------------------------------------------------------
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--state", default="IL")
-    ap.add_argument("--vest", required=True, help="path to the VEST shapefile")
-    args = ap.parse_args()
-    usps = args.state.upper()
+def allocate_blocks(usps, vest_path):
+    """
+    Blocks with their allocated Democratic and Republican votes.
 
+    Split out so the illustrated walkthrough draws the same objects this
+    script counts. Two copies of the allocation would eventually disagree,
+    and the figures would then illustrate something the numbers do not say.
+    """
     # --- blocks, with voting-age population and their VTD id -----------------
     blocks = pl94.load_blocks(ROOT / "data" / "raw" / f"{usps.lower()}2020.pl.zip",
                               with_vap=True)
@@ -164,7 +164,7 @@ def main():
           f"pop {blocks['pop'].sum():,}, VAP {blocks['vap'].sum():,}")
 
     # --- precincts -----------------------------------------------------------
-    vest = gpd.read_file(args.vest)
+    vest = gpd.read_file(vest_path)
     vest = vest[["GEOID20", DEM, REP, "geometry"]].copy()
     tot_d, tot_r = int(vest[DEM].sum()), int(vest[REP].sum())
     print(f"VEST: {len(vest):,} precincts, D {tot_d:,} R {tot_r:,} "
@@ -207,6 +207,20 @@ def main():
     got_d, got_r = occ["dem"].sum(), occ["rep"].sum()
     print(f"  allocated: D {got_d:,.0f} R {got_r:,.0f}  "
           f"(retained {(got_d+got_r)/(tot_d+tot_r):.4%} of the two-party vote)")
+
+    return occ, vest, tot_d, tot_r
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--state", default="IL")
+    ap.add_argument("--vest", required=True, help="path to the VEST shapefile")
+    args = ap.parse_args()
+    usps = args.state.upper()
+
+    occ, vest, tot_d, tot_r = allocate_blocks(usps, args.vest)
+    got_d, got_r = occ["dem"].sum(), occ["rep"].sum()
 
     # --- assign to districts under each model -------------------------------
     proj = gpd.GeoSeries(gpd.points_from_xy(occ["lon"], occ["lat"]),

@@ -409,6 +409,36 @@ One known imprecision: enacted district populations come out even to within
 side. It moves partisan shares by well under 0.1pp. The exact route is the Census
 block assignment files.
 
+### Illustrated walkthrough
+
+`scripts/walkthrough_il.py` draws the whole process as five figures, built for a
+workshop rather than a paper. Everything comes from the same
+`allocate_blocks()` the numbers do, so the pictures cannot drift from the table.
+
+| | |
+|---|---|
+| [1 · precincts](docs/walkthrough/1_precincts.png) | what you start with |
+| [2 · one precinct](docs/walkthrough/2_one_precinct.png) | the split, and the only assumption in it |
+| [3 · blocks](docs/walkthrough/3_blocks.png) | the intermediate product |
+| [4 · five plans](docs/walkthrough/4_five_plans.png) | the result, spatially |
+| [5 · sorted profiles](docs/walkthrough/5_profiles.png) | the result, and the argument |
+
+![Districts sorted within each plan](docs/walkthrough/5_profiles.png)
+
+Figure 2 is the one worth dwelling on: it picks a real precinct that a district
+boundary cuts, shows its blocks as points sized by voting-age population, and
+states in the legend exactly how its 843 Democratic and 369 Republican votes get
+divided. That is the entire assumption, made concrete on one precinct.
+
+Figure 3 makes a point that is easy to miss: splitting votes to blocks adds no
+new detail to *partisanship* — every block in a precinct inherits the same
+margin. What it adds is detail about *where the votes are*, which is what the
+district assignment then needs.
+
+The district markers in figure 2 are deliberately purple and green. Blue
+anywhere near a partisan map reads as "Democratic" no matter what the legend
+says, and those two districts mean nothing of the kind.
+
 ### Getting the election data
 
 The VEST file is **not redistributed here**. It is CC BY 4.0, so it could be, but
