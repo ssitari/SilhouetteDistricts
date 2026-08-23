@@ -147,7 +147,30 @@ def fig3_blocks(occ, out):
     print("wrote", out.name)
 
 
-def model_patches(ax, model, shares):
+def state_frame(pad=0.02):
+    """
+    One bounding box, shared by every panel.
+
+    All five plans cover the same state, so a common frame keeps them at an
+    identical scale -- which is the whole point of a comparison -- while staying
+    tight to Illinois.
+
+    Two earlier mistakes, both worth not repeating. Centring on the MEAN of the
+    outline vertices drags the view south, because Illinois carries far more
+    vertices along its wiggly river borders than along its straight northern
+    edge, and the top of the state gets clipped. And forcing a SQUARE window
+    (one span on both axes) wastes 44% of the width on a state nearly twice as
+    tall as it is wide, so the maps shrink and float in whitespace.
+    """
+    spec = json.loads((ROOT / "data/derived/il_districts.json").read_text())
+    pts = np.vstack([np.asarray(l["outline"]) for l in spec["lobes"]])
+    x0, x1 = float(pts[:, 0].min()), float(pts[:, 0].max())
+    y0, y1 = float(pts[:, 1].min()), float(pts[:, 1].max())
+    mx, my = (x1 - x0) * pad, (y1 - y0) * pad
+    return x0 - mx, x1 + mx, y0 - my, y1 + my
+
+
+def model_patches(ax, model, shares, lw=0.2):
     """Draw one plan, each district filled by its allocated Democratic share."""
     if model == "outward":
         spec = json.loads((ROOT / "data/derived/il_districts.json").read_text())
@@ -159,7 +182,7 @@ def model_patches(ax, model, shares):
             for k in range(spec["seats"], 0, -1):
                 pt = MplPolygon(a + (o - a) * spec["breaks"][k], closed=True,
                                 facecolor=CMAP(NORM(shares[k - 1])), edgecolor="white",
-                                linewidth=.2)
+                                linewidth=lw)
                 ax.add_patch(pt)
                 pt.set_clip_path(clip)
         return np.vstack([np.asarray(l["outline"]) for l in spec["lobes"]])
@@ -170,7 +193,7 @@ def model_patches(ax, model, shares):
             for ring in shell:
                 ax.add_patch(MplPolygon(np.asarray(ring), closed=True,
                                         facecolor=CMAP(NORM(shares[k])),
-                                        edgecolor="white", linewidth=.2))
+                                        edgecolor="white", linewidth=lw))
         return np.vstack([np.asarray(r) for r in res["lobes"]])
 
     if model == "enacted":
@@ -181,7 +204,8 @@ def model_patches(ax, model, shares):
         cd = cd.sort_values("district").to_crs(crs_for(USPS))
     cd = cd.reset_index(drop=True)
     cd["share"] = shares[: len(cd)]
-    cd.plot(ax=ax, column="share", cmap=CMAP, norm=NORM, edgecolor="white", linewidth=.35)
+    cd.plot(ax=ax, column="share", cmap=CMAP, norm=NORM, edgecolor="white",
+            linewidth=lw * 1.7)
     b = cd.total_bounds
     return np.array([[b[0], b[1]], [b[2], b[3]]])
 
@@ -191,13 +215,12 @@ def fig4_maps(alloc, out):
     # tight_layout would reserve space against the pre-colourbar geometry.
     fig, axes = plt.subplots(1, 5, figsize=(19, 6.6), dpi=130,
                              layout="constrained")
+    fx0, fx1, fy0, fy1 = state_frame()
     for ax, model in zip(axes, MODELS):
         shares = alloc[alloc["model"] == model].sort_values("district")["dem_two_party"].to_numpy()
-        pts = model_patches(ax, model, shares)
-        span = max(np.ptp(pts[:, 0]), np.ptp(pts[:, 1])) * 1.04
-        cx, cy = pts[:, 0].mean(), pts[:, 1].mean()
-        ax.set_xlim(cx - span / 2, cx + span / 2)
-        ax.set_ylim(cy - span / 2, cy + span / 2)
+        model_patches(ax, model, shares)
+        ax.set_xlim(fx0, fx1)
+        ax.set_ylim(fy0, fy1)
         # Illinois is tall and narrow, so an equal-aspect panel shrinks to fit
         # the width and then centres, dropping the map away from its own title.
         # Anchor north so the title stays attached to the map.
@@ -213,6 +236,56 @@ def fig4_maps(alloc, out):
     cb.set_label("Democratic share of the two-party vote", fontsize=9, color=MUTED)
     cb.ax.tick_params(labelsize=8, colors=MUTED)
     cb.outline.set_visible(False)
+    fig.savefig(out, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print("wrote", out.name)
+
+
+def fig4_large(alloc, statewide, out):
+    """
+    The same five plans, two columns, big enough to read district boundaries.
+
+    Illinois is tall and narrow, so five across leaves each panel too small for
+    a border to survive. Two columns turns the wasted width into panel height;
+    the sixth cell takes the legend rather than sitting empty.
+    """
+    fig, axes = plt.subplots(3, 2, figsize=(15, 26), dpi=150, layout="constrained")
+    flat = axes.ravel()
+    fx0, fx1, fy0, fy1 = state_frame()
+
+    for ax, model in zip(flat, MODELS):
+        shares = alloc[alloc["model"] == model].sort_values("district")["dem_two_party"].to_numpy()
+        model_patches(ax, model, shares, lw=0.45)
+        ax.set_xlim(fx0, fx1)
+        ax.set_ylim(fy0, fy1)
+        ax.set_aspect("equal")
+        ax.axis("off")
+        n_comp = int(((shares > .45) & (shares < .55)).sum())
+        n_land = int(((shares > .70) | (shares < .30)).sum())
+        ax.set_title(model, fontsize=20, loc="left", color=INK, pad=14)
+        ax.text(0, 1.002, f"{int((shares > .5).sum())} Democratic seats   ·   "
+                          f"{n_comp} competitive (45–55%)   ·   {n_land} landslide",
+                transform=ax.transAxes, fontsize=12, color=MUTED, va="bottom")
+
+    legend = flat[5]
+    legend.axis("off")
+    sm = plt.cm.ScalarMappable(cmap=CMAP, norm=NORM)
+    cb = fig.colorbar(sm, ax=legend, orientation="horizontal", fraction=0.10,
+                      pad=0.02, aspect=18)
+    cb.set_label("Democratic share of the two-party vote", fontsize=13, color=MUTED)
+    cb.ax.tick_params(labelsize=11, colors=MUTED)
+    cb.outline.set_visible(False)
+    legend.text(0.5, 0.52,
+                "Illinois, 2020 presidential"
+                + chr(10) + f"statewide {statewide:.1%} Democratic, two-party"
+                + chr(10) + "proportionality would be 10 of 17 seats"
+                + chr(10) + chr(10)
+                + "The same ballots under five plans. Only the"
+                + chr(10) + "enacted map was drawn by people; it has the"
+                + chr(10) + "fewest competitive districts of any of them.",
+                ha="center", va="center", fontsize=13, color=INK, linespacing=1.6)
+
+    fig.suptitle("The same votes, five plans", fontsize=24, x=0.01, ha="left")
     fig.savefig(out, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print("wrote", out.name)
@@ -282,6 +355,7 @@ def main():
     fig2_one_precinct(occ, vest, which_out, DOCS / "2_one_precinct.png")
     fig3_blocks(occ, DOCS / "3_blocks.png")
     fig4_maps(alloc, DOCS / "4_five_plans.png")
+    fig4_large(alloc, statewide, DOCS / "4_five_plans_large.png")
     fig5_profiles(alloc, statewide, DOCS / "5_profiles.png")
 
 

@@ -421,6 +421,7 @@ workshop rather than a paper. Everything comes from the same
 | [2 · one precinct](docs/walkthrough/2_one_precinct.png) | the split, and the only assumption in it |
 | [3 · blocks](docs/walkthrough/3_blocks.png) | the intermediate product |
 | [4 · five plans](docs/walkthrough/4_five_plans.png) | the result, spatially |
+| [4 · five plans, large](docs/walkthrough/4_five_plans_large.png) | two columns, 2251 × 3918, district borders readable |
 | [5 · sorted profiles](docs/walkthrough/5_profiles.png) | the result, and the argument |
 
 ![Districts sorted within each plan](docs/walkthrough/5_profiles.png)
