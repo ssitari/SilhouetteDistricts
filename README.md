@@ -121,11 +121,24 @@ Sort every block on one coordinate, accumulate, cut. No anchor, no erosion, and
 nothing to enforce: half-planes are disjoint and exhaustive, so the districts
 partition the state by construction.
 
-Cuts are made in **lon/lat**, so these are true meridians and parallels — which
-means they are slightly curved when drawn on an Albers map, and the polygons are
-segmentized at 0.02° before reprojection to keep that curve. Cutting in projected
-metres instead would give lines that look perfectly straight on screen but are
-not meridians.
+Cuts are made in **lon/lat**, so these are true meridians and parallels. That is
+visible on the map, and not in the way one might guess. Albers is a *conic*
+projection: meridians come out as straight lines converging toward the pole, and
+parallels as concentric arcs. Measured across Illinois (353 km wide, 626 km tall):
+
+| | drift across the state | bow from a straight chord |
+|---|---|---|
+| a true meridian | 51.6 km horizontally | 0.00 km — straight, but tilted |
+| a true parallel | 22.6 km vertically | 1.74 km — a gentle arc |
+
+So the meridian boundaries fan by about 15% of the state's width. They are not
+curved; they lean. The parallel boundaries do curve, mildly. Polygons are
+segmentized at 0.02° before reprojection so the arcs survive — reprojecting four
+slab corners alone would replace them with chords.
+
+Cutting in projected metres instead would give boundaries that are perfectly
+vertical and horizontal on screen, but they would not be meridians or parallels
+and would have no simple geographic description.
 
 ## Method: the `outward` model
 
