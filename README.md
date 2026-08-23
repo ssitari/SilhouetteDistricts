@@ -446,9 +446,12 @@ The VEST file is **not redistributed here**. It is CC BY 4.0, so it could be, bu
 referring to the deposit keeps the citation attached and avoids carrying a fork
 that can drift from an upstream revision.
 
-> Voting and Election Science Team. *2020 Precinct-Level Election Results.*
-> Harvard Dataverse. <https://dataverse.harvard.edu/dataverse/2020_precincts>
-> Licensed CC BY 4.0.
+> Voting and Election Science Team. (2020). *2020 Precinct-Level Election
+> Results* (Version V48) [Dataset]. Harvard Dataverse.
+> <https://doi.org/10.7910/DVN/K7760H>
+
+Licensed CC BY 4.0. The version matters — VEST revises these files, so cite the
+version you actually ran against.
 
 Download the Illinois file (`il_2020.shp` and siblings, plus `documentation.txt`)
 and point the script at it:
