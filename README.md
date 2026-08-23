@@ -343,6 +343,92 @@ is quick.
 | `data/gis_inward/`, `gis_meridian/`, `gis_parallel/` | The other three models as GeoJSON |
 | `data/derived_meridian/`, `derived_parallel/` | Cut longitudes / latitudes per state |
 
+## Partisan allocation (Illinois)
+
+`scripts/allocate_votes.py` takes a real past election and asks where those votes
+would have landed under each model. **This is not a prediction** — nobody ran in
+these districts. It is what redistricting analysts call a partisan index: real
+ballots, redistributed.
+
+One race is enough here, and deliberately so. All the models redistribute the
+*same* ballots, so any quirk of the election lands identically in each and
+cancels in the comparison. A composite of several races would be needed to
+characterise a district in isolation; it is not needed to compare geometries.
+
+2020 presidential results, on 2020 census blocks — the same year, so there is no
+temporal mismatch to explain away.
+
+### The join is exact, not interpolated
+
+VEST's Illinois precincts *are* Census 2020 VTDs, and VTDs are built from blocks,
+so blocks nest inside them exactly. 10,081 of 10,084 join on GEOID outright,
+covering 99.98% of the state; the three VEST edited (documented merges in
+Washington and Winnebago counties) fall back to a point-in-polygon join. No areal
+interpolation, no slivers, no precinct-name matching — the usual sources of pain
+are simply absent.
+
+Within a VTD, votes are split among blocks by **voting-age population**, read
+from segment 2 of the same PL 94-171 files. Weighting by total population would
+over-credit blocks with more children, which is systematically suburban.
+
+### Results, with the enacted map as a fifth column
+
+Statewide two-party Democratic share 58.66%, so proportionality is 10 of 17.
+
+| model | Dem seats | competitive (45–55%) | landslide (>70% / <30%) | split-VTD pop |
+|---|---|---|---|---|
+| **enacted (118th)** | 14 | **1** | **8** | **4.4%** |
+| outward | 13 | 6 | 4 | 30.1% |
+| inward | **15** | 6 | 5 | 32.0% |
+| meridian | 12 | 2 | 4 | 16.9% |
+| parallel | 12 | 2 | 6 | 11.2% |
+
+The map drawn by people produces far less competition than maps drawn by rules
+that ignore everything: one competitive district against six. The enacted profile
+runs 28.2, 30.2, 39.0 and then jumps straight to 54.0 — Republicans packed into
+three seats and nothing left near the middle — while the geometric models drift
+across the range, because they sort on a continuous gradient rather than
+optimising anything.
+
+Seat count alone would mislead. Erosion takes *more* seats than the enacted map
+(15 vs 14), but buys them with six coin-flip districts that a normal polling
+error would swing, where the enacted map's 14 rest on one. That is the difference
+between an accident and a design, and the summary statistic hides it.
+
+### What the result rests on
+
+Within a VTD, partisanship is assumed uniform. That only bites where a district
+boundary *cuts* a VTD, so the script reports the share of population in a split
+VTD per model — the last column above. It is the honest error budget: the enacted
+map is measured almost directly at 4.4%, while the most dramatic result (inward)
+leans hardest on the assumption at 32%.
+
+One known imprecision: enacted district populations come out even to within
+0.09% rather than the ~1 person the law requires, because the generalized
+`cb_500k` boundaries put blocks within ~100 m of a district line on the wrong
+side. It moves partisan shares by well under 0.1pp. The exact route is the Census
+block assignment files.
+
+### Getting the election data
+
+The VEST file is **not redistributed here**. It is CC BY 4.0, so it could be, but
+referring to the deposit keeps the citation attached and avoids carrying a fork
+that can drift from an upstream revision.
+
+> Voting and Election Science Team. *2020 Precinct-Level Election Results.*
+> Harvard Dataverse. <https://dataverse.harvard.edu/dataverse/2020_precincts>
+> Licensed CC BY 4.0.
+
+Download the Illinois file (`il_2020.shp` and siblings, plus `documentation.txt`)
+and point the script at it:
+
+```bash
+python scripts/allocate_votes.py --state IL --vest /path/to/il_2020.shp
+```
+
+Enacted district boundaries are fetched automatically from the Census
+cartographic boundary files (`cb_2023_us_cd118_500k`).
+
 ## Data sources and citations
 
 > U.S. Census Bureau. *2020 Census Redistricting Data (P.L. 94-171) Summary

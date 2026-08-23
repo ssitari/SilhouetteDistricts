@@ -38,6 +38,13 @@ PL_BASE = ("https://www2.census.gov/programs-surveys/decennial/2020/data/"
 
 SUMLEV = 2
 LOGRECNO = 7
+# County and VTD, so a block can be joined to its voting district by GEOID.
+# VTDs are built FROM blocks by the Census redistricting programme, so this join
+# is exact -- no areal interpolation, no slivers, no precinct-name matching.
+STATEFP = 12
+COUNTYFP = 14
+VTD = 77
+VTDI = 78
 GEOCODE = 9
 AREALAND = 84
 AREAWATR = 85
@@ -90,9 +97,15 @@ def fetch_pl(state_name: str, usps: str, refresh: bool = False) -> Path:
     return dest
 
 
-def load_blocks(path: Path) -> pd.DataFrame:
+def load_blocks(path: Path, with_vap: bool = False) -> pd.DataFrame:
     """
-    Return one row per 2020 census block: geoid, pop, lat, lon, land/water area.
+    Return one row per 2020 census block: geoid, pop, lat, lon, land/water area,
+    plus the block's VTD (voting district) id.
+
+    with_vap also reads segment 2 for the 18-and-over population. VAP is the
+    better weight when splitting precinct votes among blocks -- weighting by
+    total population over-credits places with more children, which is
+    systematically the suburbs.
 
     Reads the geoheader line by line rather than through pandas: the file is
     ~40 MB of 97-column records of which we want six columns and one summary
@@ -116,9 +129,29 @@ def load_blocks(path: Path) -> pd.DataFrame:
                         float(f[INTPTLON]),
                         int(f[AREALAND]),
                         int(f[AREAWATR]),
+                        f[STATEFP] + f[COUNTYFP] + f[VTD],
+                        f[VTDI],
+                        int(f[LOGRECNO]),
                     ))
 
-    df = pd.DataFrame(rows, columns=["geoid", "pop", "lat", "lon", "aland", "awater"])
+    df = pd.DataFrame(rows, columns=["geoid", "pop", "lat", "lon", "aland", "awater",
+                                     "vtd", "vtdi", "logrecno"])
+
+    if with_vap:
+        # Segment 2 holds P3 (race, 18+); field 5 is P0030001, the voting-age
+        # total. Keyed by LOGRECNO, the same key the geoheader carries.
+        vap = {}
+        with zipfile.ZipFile(path) as zf:
+            seg2 = next(n for n in zf.namelist() if n.lower().endswith("000022020.pl"))
+            with zf.open(seg2) as fh:
+                for line in io.TextIOWrapper(fh, encoding="latin-1"):
+                    g = line.rstrip().split("|")
+                    vap[int(g[4])] = int(g[5])
+        df["vap"] = df["logrecno"].map(vap)
+        if df["vap"].isna().any():
+            raise ValueError(f"{path.name}: {int(df['vap'].isna().sum())} blocks without VAP")
+        if (df["vap"] > df["pop"]).any():
+            raise ValueError(f"{path.name}: VAP exceeds total population somewhere")
 
     if state_pop is None:
         raise ValueError(f"{path.name}: no SUMLEV {SUMLEV_STATE} record found")
