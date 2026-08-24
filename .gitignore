@@ -8,10 +8,19 @@ data/raw/
 
 # Regenerated in ~1 min by scripts/export_gis.py, and the combined file plus the
 # per-state files are the same data twice. Kept local.
-data/gis/
-data/gis_inward/
-data/gis_meridian/
-data/gis_parallel/
+# The combined file per model IS committed -- it is the whole dataset and the
+# thing worth sharing. The 50 per-state files alongside it are the same data a
+# second time; filter the combined file by `usps`, or regenerate them with
+# --separate. Note the trailing slash is gone: git will not descend into an
+# excluded directory, so a negation inside one never fires.
+data/gis/*
+!data/gis/districts.geojson
+data/gis_inward/*
+!data/gis_inward/districts_inward.geojson
+data/gis_meridian/*
+!data/gis_meridian/districts_meridian.geojson
+data/gis_parallel/*
+!data/gis_parallel/districts_parallel.geojson
 
 # 9.3 MB of explicit shell geometry, rebuilt in ~2 min by build_inward.py.
 # The summary is small and worth keeping.

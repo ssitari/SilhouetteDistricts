@@ -344,6 +344,32 @@ The same non-nesting broke the solver's original area calculation, which took
 after any full solve — it is the boolean pass only, not the ray-casting, so it
 is quick.
 
+### The district geometries, ready to open
+
+All four models are committed as GeoJSON in **EPSG:4326**, one file per model,
+435 districts each:
+
+| file | size |
+|---|---|
+| `data/gis/districts.geojson` | 18.5 MB |
+| `data/gis_inward/districts_inward.geojson` | 8.5 MB |
+| `data/gis_meridian/districts_meridian.geojson` | 6.6 MB |
+| `data/gis_parallel/districts_parallel.geojson` | 7.5 MB |
+
+Attributes: `usps`, `state`, `district`, `seats`, `population`, `area_km2`,
+`density_km2`, `pieces`, plus `s_inner`/`s_outer` (outward), `offset_inner_m`/
+`offset_outer_m` (inward), or the cut coordinate (stripes).
+
+Drop one into QGIS and it opens as-is. Per-state files are *not* committed —
+they are the same data a second time; filter on `usps`, or regenerate with
+`--separate`.
+
+Two things to expect. The **insets are not applied**: Alaska and Hawaii sit at
+their true locations, so the layer will not look like the national map, which
+places them as insets. And the outward model is heavily fragmented by design —
+Florida's worst district is 100 separate polygons — so a MultiPolygon with a
+three-figure part count is correct, not corrupt.
+
 ## Outputs
 
 | File | What it is |
