@@ -1,5 +1,7 @@
 # Silhouette Districts
 
+To be clear, the dissolution of the VRA and the emergence of inter-decade partisan redistricting is no laughing matter.  But that doesn't mean we can't laugh at it. At any rate, I am working on a few legitimately non-partisan and hopefully attractive redistricting proposals.  If we can't have democracy, we should at least get some cool looking maps. Free to use by any state legislatures (attribution appreciated). 
+
 All 435 congressional districts redrawn so that **every district is the shape of
 its own state**. District 1 is a solid scaled copy of the state centred on an
 interior anchor; districts 2 through *n* are rings around it, each a larger copy
