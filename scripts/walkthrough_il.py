@@ -307,16 +307,41 @@ def fig5_profiles(alloc, statewide, out):
         ax.scatter(x, s, c=s, cmap=CMAP, norm=NORM, s=68, zorder=3,
                    edgecolor="white", linewidth=.7)
         n_comp = int(((s > .45) & (s < .55)).sum())
-        ax.annotate(f"{int((s > .5).sum())} seats", (i, -0.105),
+        n_ranks = len(s)
+        ax.annotate(f"{int((s > .5).sum())} seats", (i, -0.205),
                     xycoords=("data", "axes fraction"), ha="center",
                     fontsize=10.5, color=INK, fontweight="600",
                     annotation_clip=False)
-        ax.annotate(f"{n_comp} competitive", (i, -0.148),
+        ax.annotate(f"{n_comp} competitive", (i, -0.248),
                     xycoords=("data", "axes fraction"), ha="center",
                     fontsize=9, color=MUTED, annotation_clip=False)
 
+    # Give the horizontal offset an explicit axis. The spread inside each cluster
+    # is district RANK -- sorted ascending, so leftmost is that plan's most
+    # Republican seat and rightmost its most Democratic -- and the slope of the
+    # grey line is how sharply the plan sorts. Unlabelled, it is indistinguishable
+    # from decorative jitter, and a reader who assumes jitter ignores the shape,
+    # which is the part carrying the argument. One short axis per cluster, rather
+    # than a single spine, so nothing suggests the models form a continuum.
+    trans = ax.get_xaxis_transform()
+    ticks = np.linspace(-.28, .28, n_ranks)
+    for i in range(len(MODELS)):
+        ax.plot([i - .28, i + .28], [-0.035, -0.035], transform=trans,
+                color=RULE, lw=1, clip_on=False, zorder=4)
+        for t in ticks:
+            ax.plot([i + t, i + t], [-0.035, -0.055], transform=trans,
+                    color=RULE, lw=0.8, clip_on=False, zorder=4)
+    for lab, off in ((f"{1}", -.28), (f"{n_ranks}", .28)):
+        ax.text(off, -0.075, lab, transform=trans, ha="center", va="top",
+                fontsize=8, color=MUTED)
+    # Sits in the gap beside the first cluster, not beneath it: directly below is
+    # where the model name goes.
+    ax.text(0.34, -0.052, "district rank", transform=trans, ha="left", va="center",
+            fontsize=8.5, color=MUTED, style="italic")
+
     ax.set_xticks(range(len(MODELS)))
     ax.set_xticklabels(MODELS, fontsize=11)
+    ax.tick_params(axis="x", which="major", length=0, pad=44)
     ax.set_xlim(-.5, 5.35)
     ax.set_ylim(.2, .93)
     ax.set_yticks([.2, .3, .4, .5, .6, .7, .8, .9])
@@ -327,10 +352,13 @@ def fig5_profiles(alloc, statewide, out):
     ax.spines["left"].set_color(RULE)
     ax.tick_params(colors=MUTED)
     ax.set_title("5 · Districts sorted, within each plan", fontsize=14, loc="left", pad=12)
-    fig.text(0.02, -0.10,
-             "Shaded band is 45–55%. The enacted map has one district in it; the ring "
-             "models have six each. Dashed line is the statewide result.",
-             fontsize=9.5, color=MUTED, ha="left")
+    fig.text(0.02, -0.17,
+             "Within each plan the 17 districts are sorted left to right, most "
+             "Republican to most Democratic — the tick marks are that rank axis, and "
+             "the slope of the grey line is how sharply the plan sorts."
+             + chr(10) + "Shaded band is 45–55%. The enacted map has one district in "
+             "it; the ring models have six each. Dashed line is the statewide result.",
+             fontsize=9.5, color=MUTED, ha="left", linespacing=1.7)
     fig.savefig(out, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print("wrote", out.name)
@@ -339,21 +367,30 @@ def fig5_profiles(alloc, statewide, out):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--vest", required=True)
+    ap.add_argument("--vest", help="path to the VEST shapefile; needed only for "
+                                   "figures 1-3, which draw the precincts and blocks")
     args = ap.parse_args()
     DOCS.mkdir(parents=True, exist_ok=True)
 
-    occ, vest, tot_d, tot_r = allocate_blocks(USPS, args.vest)
+    # Figures 4 and 5 are built from the committed allocation CSV alone, so they
+    # regenerate from a fresh clone. Only 1-3 need the VEST file, which this repo
+    # deliberately does not redistribute.
     alloc = pd.read_csv(ROOT / "data/derived_votes/il_allocation.csv")
-    statewide = occ["dem"].sum() / (occ["dem"].sum() + occ["rep"].sum())
+    one = alloc[alloc["model"] == "enacted"]
+    statewide = one["dem"].sum() / (one["dem"].sum() + one["rep"].sum())
 
-    proj = gpd.GeoSeries(gpd.points_from_xy(occ["lon"], occ["lat"]),
-                         crs="EPSG:4269").to_crs(crs_for(USPS))
-    which_out, _ = assign_outward(USPS, occ, proj.x.to_numpy(), proj.y.to_numpy())
+    if args.vest:
+        occ, vest, tot_d, tot_r = allocate_blocks(USPS, args.vest)
+        proj = gpd.GeoSeries(gpd.points_from_xy(occ["lon"], occ["lat"]),
+                             crs="EPSG:4269").to_crs(crs_for(USPS))
+        which_out, _ = assign_outward(USPS, occ, proj.x.to_numpy(), proj.y.to_numpy())
+        fig1_precincts(vest, DOCS / "1_precincts.png")
+        fig2_one_precinct(occ, vest, which_out, DOCS / "2_one_precinct.png")
+        fig3_blocks(occ, DOCS / "3_blocks.png")
+    else:
+        print("no --vest given: skipping figures 1-3 (they need the precinct file);"
+              " see the README for the Dataverse DOI")
 
-    fig1_precincts(vest, DOCS / "1_precincts.png")
-    fig2_one_precinct(occ, vest, which_out, DOCS / "2_one_precinct.png")
-    fig3_blocks(occ, DOCS / "3_blocks.png")
     fig4_maps(alloc, DOCS / "4_five_plans.png")
     fig4_large(alloc, statewide, DOCS / "4_five_plans_large.png")
     fig5_profiles(alloc, statewide, DOCS / "5_profiles.png")
