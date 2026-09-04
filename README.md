@@ -82,6 +82,14 @@ invisible. State adjacency is a planar graph, so greedy colouring by descending
 degree seats no two neighbours on the same offset, with the least-used slot
 breaking ties: 0 clashes and an exactly even 10 states per slot.
 
+The live map uses this same symbology. The offsets are not recomputed in the
+browser — adjacency needs the boundary shapefile — so `scripts/add_color_offsets.py`
+bakes them into the bundle as `meta.color_offsets`, and the page and the figures
+above stay in step. Every district there is drawn with its own paired stroke,
+which is not decoration: the fills sit below the categorical-contrast floor by
+design, so on rings under 1% of the radius the stroke is what separates one
+district from the next.
+
 Per state, the same four:
 
 ![The four models compared across five states](docs/four_models.png)

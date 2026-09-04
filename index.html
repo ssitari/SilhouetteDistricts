@@ -4,6 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Congressional districts as nested silhouettes</title>
+
+<!-- Link previews. Static, not built from config.js: crawlers do not run the
+     module, so anything set from JavaScript would never reach a preview card. -->
+<meta name="description" content="All 435 congressional districts redrawn as nested silhouettes of their own states, each holding an equal share of the 2020 census population. A geometric thought experiment, not a redistricting proposal.">
+<link rel="canonical" href="https://ssitari.github.io/SilhouetteDistricts/">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ssitari.github.io/SilhouetteDistricts/">
+<meta property="og:title" content="Congressional districts as nested silhouettes">
+<meta property="og:description" content="435 districts, each the shape of its own state, each an equal share of the 2020 population. Ring width is inverse population density.">
+<meta property="og:image" content="https://ssitari.github.io/SilhouetteDistricts/docs/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A map of the United States in which every state is filled with nested copies of its own outline, coloured in a repeating five-colour cycle.">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Congressional districts as nested silhouettes">
+<meta name="twitter:description" content="435 districts, each the shape of its own state, each an equal share of the 2020 population. Ring width is inverse population density.">
+<meta name="twitter:image" content="https://ssitari.github.io/SilhouetteDistricts/docs/social-card.png">
+<meta name="twitter:image:alt" content="A map of the United States in which every state is filled with nested copies of its own outline, coloured in a repeating five-colour cycle.">
 <style>
   :root {
     --surface: #fff;
@@ -52,7 +72,10 @@
     margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--rule);
     font-size: .82rem; color: var(--ink-muted);
   }
-  .controls { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 1rem; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; margin: 0 0 .6rem; }
+  .figure-note { max-width: 62ch; margin: 0 0 1.25rem; color: var(--ink-muted); font-size: .85rem; }
+  .figure-note:empty { display: none; }
+  .stat-note { max-width: 62ch; margin: -1.1rem 0 1.75rem; color: var(--ink-muted); font-size: .85rem; }
   .controls label { display: flex; align-items: center; gap: .45rem; font-size: .85rem; }
   .controls select {
     font: inherit; font-size: .85rem; color: var(--ink); background: #fff;
@@ -86,10 +109,21 @@
   <h1 id="title"></h1>
   <p class="subtitle" id="subtitle"></p>
   <ul class="stats" id="stats"></ul>
+  <p class="stat-note" id="ratio-note"></p>
   <p class="explainer" id="explainer"></p>
   <p class="caveat" id="caveat"></p>
 
   <div id="legend"></div>
+
+  <div class="controls">
+    <label>View
+      <select id="view">
+        <option value="map">National map</option>
+        <option value="grid">All states, sorted by lopsidedness</option>
+      </select>
+    </label>
+  </div>
+  <p class="figure-note" id="figure-note"></p>
 
   <div id="figure">
     <div id="chart"></div>
@@ -97,25 +131,11 @@
   </div>
 
   <details id="table-wrap">
-    <summary>District table (accessible view)</summary>
+    <summary>State summary table</summary>
     <div id="table"></div>
   </details>
 
   <footer>
-    <div class="controls">
-      <label>View
-        <select id="view">
-          <option value="map">National map</option>
-          <option value="grid">All states, sorted by lopsidedness</option>
-        </select>
-      </label>
-      <label>Colour
-        <select id="color">
-          <option value="alternating">Alternating (count the districts)</option>
-          <option value="density">Population density</option>
-        </select>
-      </label>
-    </div>
     <div id="credit"></div>
   </footer>
 </main>

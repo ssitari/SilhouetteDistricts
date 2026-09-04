@@ -29,20 +29,17 @@ const el = (tag, attrs = {}) => {
 const fmt = (n, d = 0) => n.toLocaleString("en-US", { maximumFractionDigits: d });
 
 let DATA = null;
-let densityScale = null;
 
 // View state lives in the query string so a particular reading of the map --
-// the grid sorted by lopsidedness, or the density colouring -- can be linked to
-// directly rather than described in prose.
+// the grid sorted by lopsidedness -- can be linked to directly rather than
+// described in prose.
 const params = new URLSearchParams(location.search);
 const oneOf = (v, allowed, fallback) => (allowed.includes(v) ? v : fallback);
 let view = oneOf(params.get("view"), ["map", "grid"], cfg.DEFAULT_VIEW);
-let colorMode = oneOf(params.get("color"), ["alternating", "density"], cfg.DEFAULT_COLOR);
 
 function syncURL() {
   const q = new URLSearchParams();
   if (view !== cfg.DEFAULT_VIEW) q.set("view", view);
-  if (colorMode !== cfg.DEFAULT_COLOR) q.set("color", colorMode);
   const s = q.toString();
   history.replaceState(null, "", s ? `?${s}` : location.pathname);
 }
@@ -87,31 +84,23 @@ const ringRatio = (state) => {
 
 // ---------------------------------------------------------------------------
 // Colour
+//
+// Five hues, cycling every five districts, carrying no meaning of their own --
+// they exist to keep neighbours apart. Each state starts at its own slot in the
+// cycle (baked into the bundle; see config.js) so that one hue does not
+// dominate the national map and neighbouring states do not fuse along a shared
+// border. Fill and stroke always move together: the tints carry mass, the
+// strokes carry the boundaries.
 
-function buildDensityScale(states) {
-  // Density spans four orders of magnitude between rural Montana and urban New
-  // Jersey, so the ramp is stepped on log density. Linear steps would put every
-  // state except a handful of city cores in the palest bin.
-  let lo = Infinity, hi = 0;
-  for (const s of states) {
-    for (const d of s.district_density) {
-      if (d > 0) { if (d < lo) lo = d; if (d > hi) hi = d; }
-    }
-  }
-  const a = Math.log10(lo), b = Math.log10(hi);
-  return (d) => {
-    if (!(d > 0)) return cfg.DENSITY_RAMP[0];
-    const t = (Math.log10(d) - a) / (b - a || 1);
-    const i = Math.min(cfg.DENSITY_RAMP.length - 1,
-                       Math.max(0, Math.round(t * (cfg.DENSITY_RAMP.length - 1))));
-    return cfg.DENSITY_RAMP[i];
-  };
-}
+const offsetFor = (state) => {
+  const off = DATA.meta.color_offsets;
+  const v = off ? off[state.usps] : undefined;
+  return v === undefined ? cfg.CYCLE_FALLBACK_OFFSET : v;
+};
 
-const fillFor = (state, k) =>
-  colorMode === "density"
-    ? densityScale(state.district_density[k - 1])
-    : cfg.TWO_TONE[k % 2];
+const slotFor = (state, k) => (k - 1 + offsetFor(state)) % cfg.FILLS.length;
+const fillFor = (state, k) => cfg.FILLS[slotFor(state, k)];
+const strokeFor = (state, k) => cfg.STROKES[slotFor(state, k)];
 
 // ---------------------------------------------------------------------------
 // Drawing one state
@@ -141,6 +130,13 @@ function drawState(parent, defs, state, { transform = null } = {}) {
         href: `#${id}`,
         transform: scaleAbout(lobe.anchor, state.breaks[k]),
         fill: fillFor(state, k),
+        // Each copy carries its own stroke, which lands on that district's
+        // OUTER edge and survives because the next district in is smaller. The
+        // fills alone sit below the categorical-contrast floor by design, so
+        // these hairlines are what actually separates one ring from the next.
+        stroke: strokeFor(state, k),
+        "stroke-width": cfg.STROKE_WIDTH,
+        "vector-effect": "non-scaling-stroke",
         "data-usps": state.usps,
         "data-k": k,
       });
@@ -148,14 +144,17 @@ function drawState(parent, defs, state, { transform = null } = {}) {
     }
     g.appendChild(lg);
 
-    // The lobe's own boundary, above the fills. Without it a state whose outer
-    // ring is the pale tone dissolves into the page at exactly the edge where
-    // the ring crowding is most worth seeing. vector-effect keeps it one pixel
-    // at every zoom and in both views, which matters because the grid view
-    // scales states by wildly different factors.
+    // The lobe's own boundary, above the fills and OUTSIDE the clip. The
+    // outermost district already strokes this line, but clipped -- a stroke
+    // straddles its path, so clipping halves it. Redrawing it unclipped at full
+    // weight keeps the silhouette, which is the whole conceit, crisp. It takes
+    // the outermost district's colour so the state edge stays part of the
+    // cycle. vector-effect keeps it one pixel at every zoom and in both views,
+    // which matters because the grid view scales states by wildly different
+    // factors.
     g.appendChild(el("use", {
-      href: `#${id}`, fill: "none", stroke: cfg.OUTLINE,
-      "stroke-width": 1, "vector-effect": "non-scaling-stroke",
+      href: `#${id}`, fill: "none", stroke: strokeFor(state, state.seats),
+      "stroke-width": cfg.OUTLINE_WIDTH, "vector-effect": "non-scaling-stroke",
       "pointer-events": "none",
     }));
   });
@@ -272,35 +271,37 @@ function clearHover() {
 }
 
 // ---------------------------------------------------------------------------
-// Legend. The two tones carry no meaning of their own -- they alternate purely
-// so neighbouring districts stay tellable apart -- so the legend has to explain
-// the GEOMETRY instead of the colours: what a ring is, what its width means,
-// and why some states are solid.
+// Legend. The colours carry no meaning of their own -- they cycle every five
+// districts purely so neighbours stay tellable apart -- so the legend has to do
+// two jobs. It explains the GEOMETRY: what a ring is, what its width means, and
+// why some states are solid. And it says outright that the hues encode nothing,
+// because a reader who sees five colours on a map will assume they do.
 
-function nestedSwatch(widths) {
+function nestedSwatch(widths, offset = 0) {
   // A schematic state: squares nested about a common centre, with the given
-  // relative widths, drawn back to front exactly as the map is.
+  // relative widths, drawn back to front exactly as the map is -- each with its
+  // own paired stroke, since that pairing is what makes the scheme work.
   const size = 44, half = size / 2;
   let inner = "";
   let acc = 0;
   const total = widths.reduce((a, b) => a + b, 0);
   const edges = widths.map((w) => (acc += w) / total);
   for (let i = edges.length - 1; i >= 0; i--) {
-    const s = edges[i] * size;
-    inner += `<rect x="${half - s / 2}" y="${half - s / 2}" width="${s}" height="${s}"
-      fill="${cfg.TWO_TONE[(i + 1) % 2]}" />`;
+    const d = (edges[i] * (size - 2));
+    const slot = (i + offset) % cfg.FILLS.length;
+    inner += `<rect x="${half - d / 2}" y="${half - d / 2}" width="${d}" height="${d}"
+      fill="${cfg.FILLS[slot]}" stroke="${cfg.STROKES[slot]}" stroke-width="1" />`;
   }
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"
-    aria-hidden="true">${inner}
-    <rect x=".5" y=".5" width="${size - 1}" height="${size - 1}"
-      fill="none" stroke="${cfg.OUTLINE}" /></svg>`;
+    aria-hidden="true">${inner}</svg>`;
 }
 
 function renderLegend() {
   const items = [
     [nestedSwatch([1, 1, 1, 1]), "District 1 is the solid core. Higher numbers ring outward to the state border."],
     [nestedSwatch([5, 2, 1, 0.5]), "Rings crowd where people do. A thin ring is a dense one — every district holds the same number of people."],
-    [nestedSwatch([1]), "A solid state elects a single representative: the district is the state."],
+    [nestedSwatch([1], 2), "A solid state elects a single representative: the district is the state."],
+    [nestedSwatch([1, 1, 1, 1, 1, 1], 1), "The five colours mean nothing. They cycle so that neighbouring districts stay tellable apart, and each state starts at a different point in the cycle."],
   ];
   document.getElementById("legend").innerHTML = items
     .map(([svg, text]) => `<div class="item">${svg}<span>${text}</span></div>`)
@@ -332,6 +333,10 @@ function renderTable() {
 // ---------------------------------------------------------------------------
 
 function render() {
+  // The grid label key is only true of the grid, so it comes and goes with it.
+  document.getElementById("figure-note").textContent =
+    view === "grid" ? cfg.GRID_NOTE : "";
+
   const root = document.getElementById("chart");
   root.textContent = "";
   clearHover();
@@ -355,7 +360,6 @@ async function init() {
   const res = await fetch(cfg.DATA_FILE);
   if (!res.ok) throw new Error(`${cfg.DATA_FILE}: ${res.status}. Serve over HTTP, not file://`);
   DATA = await res.json();
-  densityScale = buildDensityScale(DATA.states);
 
   const widest = [...DATA.states].sort((a, b) => ringRatio(b) - ringRatio(a))[0];
   document.getElementById("stats").innerHTML = [
@@ -370,12 +374,10 @@ async function init() {
   ].map(([n, k]) => `<div><span class="n">${n}</span><span class="k">${k}</span></div>`).join("");
 
   const viewSel = document.getElementById("view");
-  const colorSel = document.getElementById("color");
   viewSel.value = view;
-  colorSel.value = colorMode;
   viewSel.addEventListener("change", (e) => { view = e.target.value; syncURL(); render(); });
-  colorSel.addEventListener("change", (e) => { colorMode = e.target.value; syncURL(); render(); });
 
+  document.getElementById("ratio-note").textContent = cfg.RING_RATIO_NOTE;
   renderLegend();
   renderTable();
   render();
