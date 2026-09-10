@@ -1,11 +1,24 @@
 # The bundle contract
 
-`app.js` draws whatever is in `data/districts.json`. Nothing in it is specific to
-the United States, to Congress, or to population — it takes a set of **regions**,
-each with an outline and a list of nested scale factors, and paints them. If you
-want to use this engine for something else, this file is the thing to satisfy.
-The scripts in `scripts/` are one way of producing it, for one dataset; they are
-not the only way.
+`app.js` draws whatever bundle `?model=` points it at. Nothing in it is specific
+to the United States, to Congress, or to population — it takes a set of
+**regions**, each divided into **units**, and paints them. If you want to use
+this engine for something else, this file is the thing to satisfy. The scripts in
+`scripts/` are one way of producing a bundle, for one dataset; they are not the
+only way.
+
+A region's geometry arrives in one of two forms, and a bundle may use either.
+Both reach the renderer as the same thing — a list of shapes, one per unit,
+painted largest first — so nothing downstream cares which it got.
+
+| Form | Fields | Use it when |
+|---|---|---|
+| **generated** | `lobes` + `breaks` | every unit is the region's outline scaled about a fixed anchor. One outline plus *n* numbers draws *n* units: 435 districts in 0.85 MB. |
+| **explicit** | `shapes` | anything else. Each unit ships its own rings. |
+
+The generated form is a large saving and a narrow one — it only works if the
+units really are homothetic copies. Erosion isn't, and neither is a straight cut
+across a projected map, so three of this repo's four models use `shapes`.
 
 `app.js` checks this contract on load. Anything it can't work with is reported on
 the page, by field, instead of throwing.
@@ -49,6 +62,7 @@ Nothing on screen has to use these words. Every visible label lives in
 | `placement` | `{key: {scale, translate: [x, y]}}` | no | Per-region transform for the map view — this is where Alaska and Hawaii get moved and shrunk. A region with no entry is drawn where the projection puts it. |
 | `color_offsets` | `{key: int}` | no | Which slot in the colour cycle each region starts at. Missing keys fall back to `CYCLE_FALLBACK_OFFSET`. |
 | `color_cycle` | int | no | The cycle length `color_offsets` was computed for. If it disagrees with `FILLS.length` in `config.js`, the page warns: the offsets have silently stopped separating neighbours. |
+| `shapes_nested` | bool | no | Only meaningful for the explicit form. See `shapes` below. |
 
 Anything else in `meta` is ignored by the page. The current bundle also carries
 `generated`, `sources`, `conus_crs`, `conus_bbox` and `simplify_tolerance_m`,
@@ -68,6 +82,15 @@ which exist for provenance, not for drawing.
 | `district_area_km2` | number[] | **yes** | Length `seats`. Hover panel; unit label is `AREA_UNIT` in `config.js`. |
 | `district_density` | number[] | **yes** | Length `seats`. Hover panel and two table columns. |
 | `district_pieces` | int[] | no | Length `seats`. How many disconnected fragments each unit is. Absent, every unit is described as a single piece. |
+
+Then **exactly one** of the two geometry forms:
+
+| Key | Type | Form | Notes |
+|---|---|---|---|
+| `breaks` + `lobes` | see below | generated | Both, or neither. |
+| `shapes` | array | explicit | Length `seats`. See below. |
+
+Carrying both is an error, and so is carrying neither; the page says so by name.
 
 `qa`, `crs` and `ideal_per_district` are carried for provenance and not read.
 
@@ -96,6 +119,41 @@ is scaled about its own anchor.
 | `outline` | `[[x, y], ...]` | 3 or more points. The ring is closed for you; don't repeat the first point. |
 
 `area_share` is carried by the current bundle and not read by the page.
+
+### `shapes` — the explicit form
+
+`shapes[k-1]` is unit *k*, as a flat list of rings:
+
+```jsonc
+"shapes": [
+  [ [[x,y], ...], [[x,y], ...] ],   // unit 1: an outer ring and a hole
+  [ [[x,y], ...] ],                 // unit 2: one ring
+  ...
+]
+```
+
+**Which rings are holes is not recorded.** Every ring of a unit goes into one
+`<path>` drawn with `fill-rule: evenodd`, which resolves containment on its own.
+A unit that is both multi-part and holed — Michigan's outermost inward collar
+spans two lobes *and* has a hole — needs no special case.
+
+Rings are closed for you; don't repeat the first point.
+
+**Paint order is derived, not declared.** The renderer sorts a region's shapes
+by area and paints the largest first, so a bundle cannot get it wrong. That
+supports both kinds of `shapes` with one code path:
+
+- **Nested** shapes, where `shapes[k]` sits inside `shapes[k-1]`, need exactly
+  that order: the larger is painted first and the smaller lands on top and hides
+  its middle, so what survives on screen is the band between them. This is how
+  the inward model works — the solver's `shells` are cumulative erosions, so
+  successive differences *are* the districts, and no band is ever constructed.
+- **Disjoint** shapes, like the meridian and parallel slabs, don't overlap, so
+  paint order is irrelevant and sorting is harmless.
+
+Set `meta.shapes_nested` if they nest. The renderer uses it for one thing: a
+nested region's largest shape is its outline, so it gets the full-weight
+silhouette stroke. Disjoint slabs already draw the region border between them.
 
 ---
 

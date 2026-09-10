@@ -21,7 +21,18 @@ same 2020 census blocks with the same checks.
 
 ## Live demo
 
-[View on GitHub Pages](https://ssitari.github.io/SilhouetteDistricts/)
+**[View on GitHub Pages](https://ssitari.github.io/SilhouetteDistricts/)** — a
+chooser, then five pages:
+
+| Page | |
+|---|---|
+| [Outward](https://ssitari.github.io/SilhouetteDistricts/map.html?model=outward) | every district is the shape of its own state |
+| [Inward](https://ssitari.github.io/SilhouetteDistricts/map.html?model=inward) | districts peel off the state line, one collar at a time |
+| [Meridian](https://ssitari.github.io/SilhouetteDistricts/map.html?model=meridian) | vertical slices, numbered east to west |
+| [Parallel](https://ssitari.github.io/SilhouetteDistricts/map.html?model=parallel) | horizontal bands, numbered south to north |
+| [Illinois](https://ssitari.github.io/SilhouetteDistricts/illinois.html) | the 2020 presidential vote under all four, plus the enacted map |
+
+Each model page is one URL, so a piece of writing can link straight at one.
 
 ---
 
@@ -51,8 +62,7 @@ edges of their states.
 The six single-district states (**DE, AK, ND, SD, VT, WY**) come out solid,
 which is correct: the district *is* the state.
 
-The national map is the poster; the small-multiples view is the one that can
-actually be read state by state, sorted by how lopsided each state is:
+Read state by state, sorted by how lopsided each state is:
 
 ![Every state's districts as small multiples, sorted by ring ratio](docs/grid.png)
 
@@ -229,7 +239,7 @@ python -m venv .venv && .venv/bin/pip install shapely pyproj geopandas requests 
 
 python scripts/fetch_all.py                 # ~1.5 GB of PL 94-171, cached
 python scripts/build_districts.py --all     # solve 50 states -> data/derived/
-python scripts/bundle.py                    # merge + simplify -> data/districts.json
+python scripts/bundle.py                    # outward  -> data/districts.json
 python scripts/preview_national.py          # optional PNG check
 python scripts/fix_areas.py                 # exact ring areas (see below)
 python scripts/export_gis.py                # GeoJSON -> data/gis/
@@ -239,7 +249,16 @@ python scripts/build_inward.py --all --gis
 python scripts/build_stripes.py --mode meridian --all --gis
 python scripts/build_stripes.py --mode parallel --all --gis
 python scripts/preview_models.py NY MI FL CO HI
+
+# web payloads for the other three, and for the Illinois page
+python scripts/bundle_polygons.py           # -> data/{inward,meridian,parallel}.json
+python scripts/bundle_illinois.py           # -> data/illinois.json
 ```
+
+`bundle_polygons.py` copies `frame_bbox`, `placement` and `color_offsets` from
+`data/districts.json`, so run `bundle.py` first — that is what makes the four
+national maps register exactly and lets a reader flip between them and see only
+the districting change.
 
 `build_inward.py` and `build_stripes.py` are far cheaper than the outward solve —
 about two minutes for all fifty states each — because neither needs ray-casting.
@@ -251,23 +270,31 @@ a `file://` URL will not work:
 python -m http.server 8000
 ```
 
-`config.js` holds the tunables — title, copy, palette, every visible label,
-default view. `app.js` is the engine. Two things `config.js` cannot cover: the
-`<title>` and link-preview tags in `index.html`, which have to be static because
-crawlers don't run the module, and the data bundle itself.
+`config.js` holds the tunables — palette, every visible label, and a `MODELS`
+entry per page giving its title, blurb, bundle, stat strip and legend. `app.js`
+is the engine for all four national maps; `illinois.js` is the one page it
+doesn't drive. Two things `config.js` cannot cover: the `<title>` and
+link-preview tags in the HTML files, which have to be static because crawlers
+don't run the module, and the data bundles themselves.
 
 ## Reusing this with other data
 
 The engine isn't about Congress, or the United States, or population. It takes a
-set of **regions**, each with an outline and a list of nested scale factors, and
-paints them. Ridings in provinces, wards in councils, prefectures — same picture,
-different bundle.
+set of **regions**, each divided into **units**, and paints them. Ridings in
+provinces, wards in councils, prefectures — same picture, different bundle.
+
+Geometry arrives in one of two forms. Where every unit really is the region's
+outline scaled about a fixed point, ship the outline once plus a scale factor per
+unit and the SVG transform does the rest — that's how 435 districts fit in
+0.85 MB. Where they aren't (erosion isn't a homothety; a straight cut across a
+projected map isn't either), ship each unit's rings. Both reach the renderer as
+"a list of shapes, painted largest first", so nothing downstream cares.
 
 Two files, in this order:
 
-**1. `data/districts.json` — the real contract.** This, not `config.js`, is what
-you have to satisfy, and the scripts in `scripts/` are only one way of producing
-it, for one dataset. What the engine requires is written down in
+**1. The bundle — the real contract.** This, not `config.js`, is what you have to
+satisfy, and the scripts in `scripts/` are only one way of producing one, for one
+dataset. What the engine requires is written down in
 [`data/SCHEMA.md`](data/SCHEMA.md), with a two-region worked example you can drop
 straight in. The short version: outlines must arrive **already projected**, in an
 equal-area CRS, in metres, y increasing north — `app.js` contains no projection
@@ -285,9 +312,10 @@ field, rather than throwing:
 US-shaped (`state`, `seats`, `usps`, `district_pop`); read them generically as
 region, unit count, region key, per-unit array. Nothing displayed has to use
 those words. The *Vocabulary* section of `config.js` holds the stat strip, the
-hover panel, the legend sentences, the table headers, the grid captions and the
-view names, with `{placeholder}` substitution. Rewrite them — several are simply
-false about anything that isn't a US state.
+hover panel, the table headers and the per-model titles, blurbs and legend
+sentences, with `{placeholder}` substitution. Rewrite them — several are simply
+false about anything that isn't a US state ("a solid state elects a single
+representative").
 
 Two things worth knowing before you change the palette or the figure:
 
@@ -295,10 +323,9 @@ Two things worth knowing before you change the palette or the figure:
   (`meta.color_cycle`, 5 here). Change the number of `FILLS` without re-running
   `scripts/add_color_offsets.py` and the offsets quietly stop keeping neighbours
   apart, which is the only job they have. The page warns when the two disagree.
-- The small-multiples grid picks its column count from the container width, down
-  to `GRID_MIN_CELL_PX`. Fifty states sit comfortably 8 across on a desktop and
-  3 across on a phone; a different number of regions may want a different
-  `GRID_MAX_COLS`.
+- Paint order is derived from shape area, not declared, so a bundle can't get it
+  wrong — but it does mean nested shapes must genuinely nest. If yours only
+  *nearly* nest, the bands will not carve cleanly.
 
 And if you fork this: `index.html` carries a Cloudflare Web Analytics token that
 reports to *this* site. Replace it with your own or delete the block.
@@ -433,7 +460,11 @@ three-figure part count is correct, not corrupt.
 
 | File | What it is |
 |---|---|
-| `data/districts.json` | The web payload — 50 states, 435 districts, 0.85 MB |
+| `data/districts.json` | Outward web payload — 50 states, 435 districts, 0.85 MB |
+| `data/inward.json` | Inward web payload — nested erosion shells, 1.5 MB |
+| `data/meridian.json` | Meridian web payload — disjoint slabs, 0.71 MB |
+| `data/parallel.json` | Parallel web payload — disjoint slabs, 0.75 MB |
+| `data/illinois.json` | Five Illinois maps plus allocated vote shares, 0.55 MB |
 | `data/gis/districts.geojson` | All 435 districts as polygons, WGS84, 18.5 MB |
 | `data/gis/XX_districts.geojson` | Per-state, with `--separate` |
 | `data/derived/XX_districts.json` | Per-state solution: breaks, lobes, anchors, QA |

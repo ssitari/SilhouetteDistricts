@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Static, like the other pages: crawlers do not run the module. -->
+<title>Illinois — where the votes land</title>
+<meta name="description" content="The 2020 presidential vote redistributed under four non-partisan districting models plus the enacted 118th-Congress map. A partisan index, not a prediction.">
+<link rel="canonical" href="https://ssitari.github.io/SilhouetteDistricts/illinois.html">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ssitari.github.io/SilhouetteDistricts/illinois.html">
+<meta property="og:title" content="Illinois — where the votes land">
+<meta property="og:description" content="The same 2020 ballots counted inside four geometric districting models and the enacted map. 12 to 15 Democratic seats out of 17, depending only on the rule.">
+<meta property="og:image" content="https://ssitari.github.io/SilhouetteDistricts/docs/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Five maps of Illinois, each divided into 17 districts shaded from red to blue by partisan lean.">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Illinois — where the votes land">
+<meta name="twitter:description" content="The same 2020 ballots counted inside four geometric districting models and the enacted map.">
+<meta name="twitter:image" content="https://ssitari.github.io/SilhouetteDistricts/docs/social-card.png">
+<meta name="twitter:image:alt" content="Five maps of Illinois, each divided into 17 districts shaded from red to blue by partisan lean.">
+
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* Five Illinois panels at one scale. auto-fit rather than a fixed count so
+     the row reflows to two, then one, on narrower screens without a breakpoint
+     for each. */
+  #panels {
+    display: grid; gap: 1rem; margin: 0 0 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .panel { margin: 0; }
+  .panel svg { width: 100%; height: auto; }
+  .panel figcaption {
+    text-align: center; font-size: .8rem; line-height: 1.3; margin-top: .3rem;
+  }
+  .panel figcaption strong { display: block; }
+  .panel figcaption span { color: var(--ink-muted); }
+
+  #ramp { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+          margin: 0 0 1.5rem; font-size: .82rem; color: var(--ink-muted); }
+  #ramp svg { flex: none; width: 260px; height: 30px; }
+  #ramp span { max-width: 44ch; }
+
+  #chart { margin: .25rem 0 .5rem; }
+  #chart svg { width: 100%; height: auto; }
+  .chart-note { max-width: 62ch; margin: 0 0 1.5rem; color: var(--ink-muted); font-size: .85rem; }
+
+  h2 { font-size: 1.05rem; margin: 2rem 0 .5rem; font-weight: 650; }
+  table.districts tr.tot td { font-weight: 650; border-top: 2px solid var(--rule); }
+</style>
+</head>
+<body>
+<main>
+  <nav id="nav" aria-label="Districting model"></nav>
+
+  <h1 id="title"></h1>
+  <p class="blurb" id="blurb"></p>
+  <p class="note" id="note"></p>
+
+  <div id="ramp"></div>
+
+  <div id="figure">
+    <div id="panels"></div>
+
+    <h2>Every district, on one axis</h2>
+    <div id="chart"></div>
+    <p class="chart-note" id="chart-note"></p>
+
+    <!-- Deliberately not a live region: pointer-reachable only, so aria-live
+         would announce on every district a mouse crossed and never fire for a
+         keyboard user. The table below is the non-pointer alternative. -->
+    <div id="tooltip" aria-hidden="true"></div>
+  </div>
+
+  <details id="table-wrap">
+    <summary>Democratic two-party share, district by district</summary>
+    <div id="table"></div>
+  </details>
+
+  <footer>
+    <div id="credit"></div>
+  </footer>
+</main>
+<script type="module" src="illinois.js"></script>
+
+<!-- Cloudflare Web Analytics. This token is this site's; on a fork, replace it
+     with your own or delete the block, or your traffic reports to it. -->
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "8bd0b9cc3d344a979211402c2f0108ee"}'></script>
+</body>
+</html>

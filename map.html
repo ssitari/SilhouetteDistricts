@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- REUSING THIS PAGE? This block is the one part config.js cannot cover, so
+     edit it here. It is static because crawlers do not run the module, so
+     anything set from JavaScript would never reach a preview card -- which also
+     means these tags describe the four models generically rather than whichever
+     one ?model= selects. Point og:image at your own 1200x630 render. -->
+<title>Four ways to cut a country</title>
+<meta name="description" content="Four non-partisan rules for dividing every state into equal-population congressional districts, run over the same 2020 census blocks. Geometric thought experiments, not redistricting proposals.">
+<link rel="canonical" href="https://ssitari.github.io/SilhouetteDistricts/map.html">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ssitari.github.io/SilhouetteDistricts/map.html">
+<meta property="og:title" content="Four ways to cut a country">
+<meta property="og:description" content="Outward, inward, meridian and parallel: four rules for cutting every state into equal-population districts, over the same 2020 census blocks.">
+<meta property="og:image" content="https://ssitari.github.io/SilhouetteDistricts/docs/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A map of the United States in which every state is filled with nested copies of its own outline, coloured in a repeating five-colour cycle.">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Four ways to cut a country">
+<meta name="twitter:description" content="Outward, inward, meridian and parallel: four rules for cutting every state into equal-population districts, over the same 2020 census blocks.">
+<meta name="twitter:image" content="https://ssitari.github.io/SilhouetteDistricts/docs/social-card.png">
+<meta name="twitter:image:alt" content="A map of the United States in which every state is filled with nested copies of its own outline, coloured in a repeating five-colour cycle.">
+
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+<main>
+  <nav id="nav" aria-label="Districting model"></nav>
+
+  <h1 id="title"></h1>
+  <p class="blurb" id="blurb"></p>
+  <p class="note" id="note"></p>
+
+  <ul class="stats" id="stats"></ul>
+  <div id="legend"></div>
+
+  <div id="figure">
+    <div id="chart"></div>
+    <!-- Deliberately not a live region. The districts are pointer-reachable
+         only, so aria-live would announce on every district a mouse crossed and
+         never fire for a keyboard user. The state table below is the
+         non-colour-alone, non-pointer alternative. -->
+    <div id="tooltip" aria-hidden="true"></div>
+  </div>
+
+  <details id="table-wrap">
+    <summary>State summary table</summary>
+    <div id="table"></div>
+  </details>
+
+  <footer>
+    <div id="credit"></div>
+  </footer>
+</main>
+<script type="module" src="app.js"></script>
+
+<!-- Cloudflare Web Analytics. This token is this site's; on a fork, replace it
+     with your own or delete the block, or your traffic reports to it. -->
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "8bd0b9cc3d344a979211402c2f0108ee"}'></script>
+</body>
+</html>
