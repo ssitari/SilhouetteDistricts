@@ -26,6 +26,9 @@
 <meta name="twitter:image:alt" content="A map of the United States in which every state is filled with nested copies of its own outline, coloured in a repeating five-colour cycle.">
 <style>
   :root {
+    /* Light-only by design -- the map's palette is tuned against white. Declared
+       so a dark-theme OS does not restyle the native <select> popup. */
+    color-scheme: light;
     --surface: #fff;
     --ink: #1a1a1a;
     --ink-muted: #6b7280;
@@ -96,7 +99,10 @@
      not the chart. Without this they inflate to the container width. */
   #legend svg { display: block; flex: none; width: 44px; height: 44px; }
 
-  table.districts { border-collapse: collapse; width: 100%; font-size: .8rem; margin-top: 1rem; }
+  /* The table has eight columns and a min-content width wider than a phone.
+     It scrolls inside itself; without this the whole page scrolls sideways. */
+  #table { overflow-x: auto; }
+  table.districts { border-collapse: collapse; width: 100%; min-width: 32rem; font-size: .8rem; margin-top: 1rem; }
   table.districts th, table.districts td { text-align: right; padding: .25rem .5rem; border-bottom: 1px solid var(--rule); }
   table.districts th:first-child, table.districts td:first-child { text-align: left; }
   table.districts td { font-variant-numeric: tabular-nums; }
@@ -127,7 +133,11 @@
 
   <div id="figure">
     <div id="chart"></div>
-    <div id="tooltip" role="status" aria-live="polite"></div>
+    <!-- Deliberately not a live region. The districts are pointer-reachable
+         only, so aria-live would announce on every district a mouse crossed and
+         never fire for a keyboard user. The state table below is the
+         non-colour-alone, non-pointer alternative. -->
+    <div id="tooltip" aria-hidden="true"></div>
   </div>
 
   <details id="table-wrap">

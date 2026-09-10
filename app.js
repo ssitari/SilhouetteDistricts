@@ -233,6 +233,9 @@ function renderGrid(root, defs) {
 const tooltip = document.getElementById("tooltip");
 let hovered = null;
 
+// Bound to pointerdown as well as pointermove. A touch device has no hover, and
+// without the down binding every per-district number on this page -- population,
+// area, density, ring width, fragment count -- is unreachable on a phone.
 function onMove(evt) {
   const t = evt.target;
   if (!(t instanceof SVGElement) || t.tagName !== "use" || !t.dataset.k) {
@@ -260,8 +263,16 @@ function onMove(evt) {
 
   const box = document.getElementById("figure").getBoundingClientRect();
   tooltip.style.opacity = "1";
-  tooltip.style.left = Math.min(evt.clientX - box.left + 14, box.width - 250) + "px";
-  tooltip.style.top = (evt.clientY - box.top + 14) + "px";
+
+  // Measure the tooltip rather than hard-coding its CSS width: the clamp has to
+  // track #tooltip's max-width, and a magic number here goes silently wrong the
+  // first time someone edits the stylesheet.
+  const touch = evt.pointerType === "touch";
+  const gap = touch ? 24 : 14;
+  const x = evt.clientX - box.left, y = evt.clientY - box.top;
+  tooltip.style.left = Math.max(0, Math.min(x + gap, box.width - tooltip.offsetWidth)) + "px";
+  // On touch the finger covers the point it is reporting on, so sit above it.
+  tooltip.style.top = Math.max(0, touch ? y - tooltip.offsetHeight - gap : y + gap) + "px";
 }
 
 function clearHover() {
@@ -345,7 +356,14 @@ function render() {
   (view === "map" ? renderMap : renderGrid)(root, defs);
   const svg = root.querySelector("svg");
   svg.addEventListener("pointermove", onMove);
-  svg.addEventListener("pointerleave", clearHover);
+  svg.addEventListener("pointerdown", onMove);
+  svg.addEventListener("pointerleave", (e) => {
+    // A touch pointer "leaves" the instant the finger lifts, which would flash
+    // the tooltip open and shut on every tap. Touch clears on the next tap
+    // instead: a tap off any district falls through onMove to clearHover, and a
+    // tap outside the figure entirely is caught by the document listener below.
+    if (e.pointerType !== "touch") clearHover();
+  });
 }
 
 async function init() {
@@ -376,6 +394,12 @@ async function init() {
   const viewSel = document.getElementById("view");
   viewSel.value = view;
   viewSel.addEventListener("change", (e) => { view = e.target.value; syncURL(); render(); });
+
+  // Bound once, not per render: dismisses a tapped tooltip when the next tap
+  // lands anywhere off the figure.
+  document.addEventListener("pointerdown", (e) => {
+    if (!e.target.closest?.("#chart svg")) clearHover();
+  });
 
   document.getElementById("ratio-note").textContent = cfg.RING_RATIO_NOTE;
   renderLegend();
