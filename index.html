@@ -5,8 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Congressional districts as nested silhouettes</title>
 
-<!-- Link previews. Static, not built from config.js: crawlers do not run the
-     module, so anything set from JavaScript would never reach a preview card. -->
+<!-- REUSING THIS PAGE? Everything below, down to </head>, is the one part
+     config.js cannot cover, so edit it here: the <title>, the description, the
+     canonical URL, and both preview blocks. They are static because crawlers do
+     not run the module, so anything set from JavaScript would never reach a
+     preview card. Point og:image at your own 1200x630 render. -->
 <meta name="description" content="All 435 congressional districts redrawn as nested silhouettes of their own states, each holding an equal share of the 2020 census population. A geometric thought experiment, not a redistricting proposal.">
 <link rel="canonical" href="https://ssitari.github.io/SilhouetteDistricts/">
 
@@ -106,6 +109,14 @@
   table.districts th, table.districts td { text-align: right; padding: .25rem .5rem; border-bottom: 1px solid var(--rule); }
   table.districts th:first-child, table.districts td:first-child { text-align: left; }
   table.districts td { font-variant-numeric: tabular-nums; }
+  /* The preflight report: what data/districts.json got wrong, shown in place of
+     the figure. Only ever seen while adapting this engine to new data. */
+  .dataerr { border: 1px solid #fca5a5; background: #fef2f2; border-radius: 7px;
+             padding: .9rem 1.1rem; font-size: .88rem; max-width: 62ch; }
+  .dataerr ul { margin: .5rem 0; padding-left: 1.2rem; }
+  .dataerr li { margin: .2rem 0; }
+  .dataerr code { background: #fff; padding: 0 .2rem; border-radius: 3px; }
+
   details { margin-top: 1.5rem; }
   summary { cursor: pointer; font-size: .85rem; color: var(--ink-muted); }
 </style>
@@ -151,7 +162,8 @@
 </main>
 <script type="module" src="app.js"></script>
 
-<!-- Cloudflare Web Analytics -->
+<!-- Cloudflare Web Analytics. This token is this site's; on a fork, replace it
+     with your own or delete the block, or your traffic reports to it. -->
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "8bd0b9cc3d344a979211402c2f0108ee"}'></script>
 <!-- End Cloudflare Web Analytics -->
 </body>

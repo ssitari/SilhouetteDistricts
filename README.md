@@ -251,8 +251,57 @@ a `file://` URL will not work:
 python -m http.server 8000
 ```
 
-`config.js` holds every tunable: title, palette, credit, default view.
-`app.js` is the engine.
+`config.js` holds the tunables — title, copy, palette, every visible label,
+default view. `app.js` is the engine. Two things `config.js` cannot cover: the
+`<title>` and link-preview tags in `index.html`, which have to be static because
+crawlers don't run the module, and the data bundle itself.
+
+## Reusing this with other data
+
+The engine isn't about Congress, or the United States, or population. It takes a
+set of **regions**, each with an outline and a list of nested scale factors, and
+paints them. Ridings in provinces, wards in councils, prefectures — same picture,
+different bundle.
+
+Two files, in this order:
+
+**1. `data/districts.json` — the real contract.** This, not `config.js`, is what
+you have to satisfy, and the scripts in `scripts/` are only one way of producing
+it, for one dataset. What the engine requires is written down in
+[`data/SCHEMA.md`](data/SCHEMA.md), with a two-region worked example you can drop
+straight in. The short version: outlines must arrive **already projected**, in an
+equal-area CRS, in metres, y increasing north — `app.js` contains no projection
+code, and leaving coordinates in degrees is the mistake with no visible symptom
+beyond a very small map.
+
+`app.js` checks the bundle on load and reports what's wrong on the page, by
+field, rather than throwing:
+
+> **data/districts.json does not match what the engine expects.**
+> · `NY: breaks: expected 27 values for 26 seats, got 26.`
+> · `meta.population_total: expected a number, got undefined. It is shown in the stat strip.`
+
+**2. `config.js` — every word on screen.** The bundle's field names are fixed and
+US-shaped (`state`, `seats`, `usps`, `district_pop`); read them generically as
+region, unit count, region key, per-unit array. Nothing displayed has to use
+those words. The *Vocabulary* section of `config.js` holds the stat strip, the
+hover panel, the legend sentences, the table headers, the grid captions and the
+view names, with `{placeholder}` substitution. Rewrite them — several are simply
+false about anything that isn't a US state.
+
+Two things worth knowing before you change the palette or the figure:
+
+- `meta.color_offsets` is greedy-coloured against a cycle of a specific length
+  (`meta.color_cycle`, 5 here). Change the number of `FILLS` without re-running
+  `scripts/add_color_offsets.py` and the offsets quietly stop keeping neighbours
+  apart, which is the only job they have. The page warns when the two disagree.
+- The small-multiples grid picks its column count from the container width, down
+  to `GRID_MIN_CELL_PX`. Fifty states sit comfortably 8 across on a desktop and
+  3 across on a phone; a different number of regions may want a different
+  `GRID_MAX_COLS`.
+
+And if you fork this: `index.html` carries a Cloudflare Web Analytics token that
+reports to *this* site. Replace it with your own or delete the block.
 
 ## Five things that will cost you hours if you don't know them
 

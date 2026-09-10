@@ -26,7 +26,13 @@ const el = (tag, attrs = {}) => {
   for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
   return n;
 };
-const fmt = (n, d = 0) => n.toLocaleString("en-US", { maximumFractionDigits: d });
+const fmt = (n, d = 0) => n.toLocaleString(cfg.LOCALE, { maximumFractionDigits: d });
+
+// {placeholder} substitution for every label in config.js. An unknown key is
+// left on screen verbatim rather than replaced with "undefined": a reuser who
+// mistypes {region} should see {region} and know where to look.
+const sub = (tpl, vals) =>
+  String(tpl).replace(/\{(\w+)\}/g, (m, k) => (k in vals ? vals[k] : m));
 
 let DATA = null;
 
@@ -171,14 +177,16 @@ function renderMap(root, defs) {
   const svg = el("svg", {
     viewBox: `${x0} ${-y1} ${x1 - x0} ${y1 - y0}`,
     role: "img",
-    "aria-label": `${DATA.meta.seats_total} congressional districts drawn as nested state silhouettes`,
+    "aria-label": sub(cfg.ARIA_MAP, { units: DATA.meta.seats_total }),
   });
   svg.appendChild(defs);
   // One flip for the whole drawing: projected y increases north, SVG y down.
   const flip = el("g", { transform: "scale(1,-1)" });
 
   for (const s of DATA.states) {
-    const place = DATA.meta.placement[s.usps];
+    // Sparse by design: only the regions that need moving have an entry (AK
+    // and HI in this bundle), and a bundle with no insets has no key at all.
+    const place = DATA.meta.placement?.[s.usps];
     drawState(flip, defs, s, {
       transform: place
         ? `translate(${place.translate[0]},${place.translate[1]}) scale(${place.scale})`
@@ -189,17 +197,31 @@ function renderMap(root, defs) {
   root.appendChild(svg);
 }
 
+let lastGridCols = 0;
+
+const gridCols = () => {
+  const avail = document.getElementById("chart").clientWidth ||
+    cfg.GRID_MAX_COLS * cfg.GRID_MIN_CELL_PX;
+  return Math.max(2, Math.min(cfg.GRID_MAX_COLS,
+    Math.floor(avail / cfg.GRID_MIN_CELL_PX)));
+};
+
 function renderGrid(root, defs) {
   // Small multiples, most lopsided first. The national map is the poster; this
   // is the one that can actually be read state by state, which is the whole
   // reason it exists alongside it.
   const states = [...DATA.states].sort((a, b) => ringRatio(b) - ringRatio(a));
-  const cols = 8, cell = 160, pad = 7, labelH = 24;
+  // Columns are responsive, not fixed. The SVG scales to the container, so a
+  // fixed 8 across renders each state at 44px under an 11px label on a phone --
+  // not a small multiple so much as a rumour of one. Drop columns until each
+  // cell clears GRID_MIN_CELL_PX on screen.
+  const cols = lastGridCols = gridCols();
+  const cell = cfg.GRID_CELL, pad = 7, labelH = 24;
   const rows = Math.ceil(states.length / cols);
   const svg = el("svg", {
     viewBox: `0 0 ${cols * cell} ${rows * (cell + labelH)}`,
     role: "img",
-    "aria-label": "Every state's districts, small multiples, sorted by ring ratio",
+    "aria-label": cfg.ARIA_GRID,
   });
   svg.appendChild(defs);
 
@@ -221,7 +243,8 @@ function renderGrid(root, defs) {
       x: cx + cell / 2, y: cy + 17, "text-anchor": "middle",
       "font-size": 11, fill: cfg.INK, "font-weight": 600,
     });
-    label.textContent = `${s.usps} · ${s.seats} · ${ringRatio(s).toFixed(0)}×`;
+    label.textContent = sub(cfg.GRID_LABEL,
+      { region: s.usps, seats: s.seats, ratio: ringRatio(s).toFixed(0) });
     svg.appendChild(label);
   });
   root.appendChild(svg);
@@ -252,14 +275,19 @@ function onMove(evt) {
   const width = s.breaks[k] - s.breaks[k - 1];
   const pieces = s.district_pieces ? s.district_pieces[k - 1] : 1;
 
+  const L = cfg.TOOLTIP_LABELS, U = cfg.AREA_UNIT;
+  const row = (label, value) =>
+    `<div class="t-row"><span>${label}</span><span>${value}</span></div>`;
   tooltip.innerHTML = `
-    <div class="t-state">${s.state} &middot; district ${k} of ${s.seats}</div>
-    <div class="t-row"><span>Population</span><span>${fmt(s.district_pop[k - 1])}</span></div>
-    <div class="t-row"><span>Area</span><span>${fmt(s.district_area_km2[k - 1])} km²</span></div>
-    <div class="t-row"><span>Density</span><span>${fmt(s.district_density[k - 1], 1)}/km²</span></div>
-    <div class="t-row"><span>Ring width</span><span>${(width * 100).toFixed(2)}% of radius</span></div>
-    ${k === 1 ? '<div class="t-note">The solid core.</div>' : ""}
-    ${pieces > 1 ? `<div class="t-note">${fmt(pieces)} separate fragments.</div>` : '<div class="t-note">A single connected piece.</div>'}`;
+    <div class="t-state">${sub(L.heading, { region: s.state, k, n: s.seats })}</div>
+    ${row(L.population, fmt(s.district_pop[k - 1]))}
+    ${row(L.area, `${fmt(s.district_area_km2[k - 1])} ${U}`)}
+    ${row(L.density, `${fmt(s.district_density[k - 1], 1)}/${U}`)}
+    ${row(L.width, `${(width * 100).toFixed(2)}${L.widthUnit}`)}
+    ${k === 1 ? `<div class="t-note">${L.core}</div>` : ""}
+    <div class="t-note">${pieces > 1
+      ? sub(L.fragments, { n: fmt(pieces) })
+      : L.onePiece}</div>`;
 
   const box = document.getElementById("figure").getBoundingClientRect();
   tooltip.style.opacity = "1";
@@ -308,14 +336,9 @@ function nestedSwatch(widths, offset = 0) {
 }
 
 function renderLegend() {
-  const items = [
-    [nestedSwatch([1, 1, 1, 1]), "District 1 is the solid core. Higher numbers ring outward to the state border."],
-    [nestedSwatch([5, 2, 1, 0.5]), "Rings crowd where people do. A thin ring is a dense one — every district holds the same number of people."],
-    [nestedSwatch([1], 2), "A solid state elects a single representative: the district is the state."],
-    [nestedSwatch([1, 1, 1, 1, 1, 1], 1), "The five colours mean nothing. They cycle so that neighbouring districts stay tellable apart, and each state starts at a different point in the cycle."],
-  ];
-  document.getElementById("legend").innerHTML = items
-    .map(([svg, text]) => `<div class="item">${svg}<span>${text}</span></div>`)
+  document.getElementById("legend").innerHTML = cfg.LEGEND
+    .map(({ widths, offset = 0, text }) =>
+      `<div class="item">${nestedSwatch(widths, offset)}<span>${text}</span></div>`)
     .join("");
 }
 
@@ -334,11 +357,112 @@ function renderTable() {
   }).join("");
   document.getElementById("table").innerHTML = `
     <table class="districts">
-      <thead><tr>
-        <th>State</th><th>Seats</th><th>Population</th><th>Per district</th>
-        <th>Ring ratio</th><th>Min density</th><th>Max density</th><th>Pieces</th>
-      </tr></thead><tbody>${rows}</tbody>
+      <thead><tr>${cfg.TABLE_HEADERS.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+      <tbody>${rows}</tbody>
     </table>`;
+}
+
+// ---------------------------------------------------------------------------
+// Preflight
+//
+// The bundle -- not config.js -- is the real contract for reusing this engine
+// with other data, and it is written by hand or by a script the reuser owns.
+// Every way of getting it slightly wrong used to fail badly: a missing meta key
+// threw inside toLocaleString before anything rendered, a district_* array of
+// the wrong length threw on the first hover, and an outline still in degrees
+// drew the whole country as a dot with no error at all.
+//
+// So check the contract up front and say what is wrong in the reuser's terms.
+// Errors block startup and are reported on the page; warnings fall back to
+// something sane and go to the console under [data]. The full schema is in
+// data/SCHEMA.md.
+
+const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+const isPair = (v) => Array.isArray(v) && v.length >= 2 && isNum(v[0]) && isNum(v[1]);
+
+function preflight(d) {
+  const errs = [], warns = [];
+  const MAX = 8;   // a badly wrong bundle should not print fifty near-identical lines
+
+  if (!d || typeof d !== "object") return { errs: ["The bundle is not a JSON object."], warns };
+  if (!d.meta || typeof d.meta !== "object") errs.push("meta: missing.");
+  if (!Array.isArray(d.states) || !d.states.length) errs.push("states: missing or empty.");
+  if (errs.length) return { errs, warns };
+
+  const m = d.meta;
+  if (!(Array.isArray(m.frame_bbox) && m.frame_bbox.length === 4 && m.frame_bbox.every(isNum))) {
+    errs.push("meta.frame_bbox: expected [x0, y0, x1, y1] of finite numbers. The map view cannot be framed without it.");
+  }
+  for (const k of ["seats_total", "population_total", "contiguous_districts"]) {
+    if (!isNum(m[k])) errs.push(`meta.${k}: expected a number, got ${JSON.stringify(m[k])}. It is shown in the stat strip.`);
+  }
+
+  const seen = new Set();
+  for (const s of d.states) {
+    const id = s?.usps ?? "(no usps)";
+    const bad = (msg) => { if (errs.length < MAX) errs.push(`${id}: ${msg}`); };
+    if (typeof s?.usps !== "string" || !s.usps) bad("usps: expected a non-empty string. It is the key that joins meta.placement and meta.color_offsets.");
+    else if (seen.has(s.usps)) bad("usps: duplicated. Keys must be unique.");
+    else seen.add(s.usps);
+    if (typeof s?.state !== "string") bad("state: expected the display name as a string.");
+    if (!Number.isInteger(s?.seats) || s.seats < 1) { bad("seats: expected an integer of 1 or more."); continue; }
+
+    const b = s.breaks;
+    if (!Array.isArray(b) || b.length !== s.seats + 1) {
+      bad(`breaks: expected ${s.seats + 1} values for ${s.seats} seats, got ${Array.isArray(b) ? b.length : typeof b}.`);
+    } else if (b[0] !== 0) {
+      bad(`breaks[0]: expected 0 (the anchor), got ${b[0]}.`);
+    } else if (b.some((v, i) => i && !(v > b[i - 1]))) {
+      bad("breaks: expected strictly ascending scale factors.");
+    } else if (Math.abs(b[b.length - 1] - 1) > 1e-6) {
+      bad(`breaks: expected the last value to be 1 (the region's own outline), got ${b[b.length - 1]}.`);
+    }
+
+    for (const f of ["district_pop", "district_area_km2", "district_density"]) {
+      if (!Array.isArray(s[f]) || s[f].length !== s.seats) {
+        bad(`${f}: expected ${s.seats} values, got ${Array.isArray(s[f]) ? s[f].length : typeof s[f]}. The hover panel reads it per district.`);
+      }
+    }
+    if (!isNum(s.population)) bad("population: expected a number. It is a table column.");
+    if (!Array.isArray(s.lobes) || !s.lobes.length) { bad("lobes: missing or empty."); continue; }
+    for (const [i, lobe] of s.lobes.entries()) {
+      if (!isPair(lobe?.anchor)) bad(`lobes[${i}].anchor: expected [x, y], the fixed point every copy is scaled about.`);
+      if (!Array.isArray(lobe?.outline) || lobe.outline.length < 3 || !lobe.outline.every(isPair)) {
+        bad(`lobes[${i}].outline: expected 3 or more [x, y] pairs.`);
+      }
+    }
+    if (!Array.isArray(s.district_pieces)) {
+      warns.push(`${id}: district_pieces missing; the hover panel will call every district a single connected piece.`);
+    }
+  }
+
+  // Coordinates left in degrees are the most likely porting mistake and the one
+  // with no visible symptom beyond a very small map. Heuristic, so a warning
+  // rather than an error: test the extent of the WHOLE bundle, since a single
+  // point at the origin proves nothing. Any real projected extent that fits
+  // inside lon/lat bounds would be a country 180 metres across.
+  let ex0 = Infinity, ey0 = Infinity, ex1 = -Infinity, ey1 = -Infinity;
+  for (const s of d.states) {
+    for (const lobe of s.lobes ?? []) {
+      for (const pt of lobe.outline ?? []) {
+        if (!isPair(pt)) continue;
+        if (pt[0] < ex0) ex0 = pt[0]; if (pt[0] > ex1) ex1 = pt[0];
+        if (pt[1] < ey0) ey0 = pt[1]; if (pt[1] > ey1) ey1 = pt[1];
+      }
+    }
+  }
+  if (isNum(ex0) && ex0 >= -180 && ex1 <= 180 && ey0 >= -90 && ey1 <= 90) {
+    warns.push("outline coordinates look like lon/lat degrees. The engine expects an equal-area projection in metres — see data/SCHEMA.md.");
+  }
+  // The baked offsets were greedy-coloured against a cycle of this length.
+  // Change the palette length without re-running scripts/add_color_offsets.py
+  // and neighbouring regions quietly stop being separated, which is the one
+  // job the offsets exist to do.
+  if (isNum(m.color_cycle) && m.color_cycle !== cfg.FILLS.length) {
+    warns.push(`meta.color_cycle is ${m.color_cycle} but config.js has ${cfg.FILLS.length} fills. meta.color_offsets was computed for a ${m.color_cycle}-slot cycle and no longer keeps neighbours apart. Re-run scripts/add_color_offsets.py.`);
+  }
+  if (errs.length >= MAX) errs.push("(further problems not listed)");
+  return { errs, warns };
 }
 
 // ---------------------------------------------------------------------------
@@ -379,19 +503,30 @@ async function init() {
   if (!res.ok) throw new Error(`${cfg.DATA_FILE}: ${res.status}. Serve over HTTP, not file://`);
   DATA = await res.json();
 
+  const { errs, warns } = preflight(DATA);
+  for (const w of warns) console.warn("[data]", w);
+  if (errs.length) {
+    document.getElementById("chart").innerHTML =
+      `<div class="dataerr"><strong>${cfg.DATA_FILE} does not match what the engine expects.</strong>
+       <ul>${errs.map((e) => `<li>${e}</li>`).join("")}</ul>
+       <p>The contract is documented in <code>data/SCHEMA.md</code>.</p></div>`;
+    return;
+  }
+
   const widest = [...DATA.states].sort((a, b) => ringRatio(b) - ringRatio(a))[0];
+  const S = cfg.STAT_LABELS;
   document.getElementById("stats").innerHTML = [
-    [fmt(DATA.meta.seats_total), "districts"],
-    [fmt(DATA.states.length), "states"],
-    // Resident population of the 50 states. Deliberately not the apportionment
-    // population, which is larger because it adds overseas federal employees
-    // and is the figure the seat counts were computed from.
-    [fmt(DATA.meta.population_total), "residents, 50 states"],
-    [`${ringRatio(widest).toFixed(0)}×`, `widest ring ratio (${widest.usps})`],
-    [`${fmt(DATA.meta.contiguous_districts)}`, `of ${DATA.meta.seats_total} in one piece`],
+    [fmt(DATA.meta.seats_total), S.units],
+    [fmt(DATA.states.length), S.regions],
+    [fmt(DATA.meta.population_total), S.population],
+    [`${ringRatio(widest).toFixed(0)}×`, sub(S.widest, { region: widest.usps })],
+    [fmt(DATA.meta.contiguous_districts), sub(S.contiguous, { total: DATA.meta.seats_total })],
   ].map(([n, k]) => `<div><span class="n">${n}</span><span class="k">${k}</span></div>`).join("");
 
   const viewSel = document.getElementById("view");
+  // The two <option> labels live in config.js like every other string. The
+  // values are the engine's, and must stay "map" and "grid".
+  for (const o of viewSel.options) o.textContent = cfg.VIEW_LABELS[o.value] ?? o.value;
   viewSel.value = view;
   viewSel.addEventListener("change", (e) => { view = e.target.value; syncURL(); render(); });
 
@@ -399,6 +534,17 @@ async function init() {
   // lands anywhere off the figure.
   document.addEventListener("pointerdown", (e) => {
     if (!e.target.closest?.("#chart svg")) clearHover();
+  });
+
+  // The grid picks its column count from the container width, so a resize that
+  // crosses a column boundary has to redraw. Debounced, and only when the count
+  // actually changes -- redrawing 435 districts on every resize event would be
+  // the most expensive thing this page does.
+  let resizeTimer = null;
+  addEventListener("resize", () => {
+    if (view !== "grid") return;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { if (gridCols() !== lastGridCols) render(); }, 150);
   });
 
   document.getElementById("ratio-note").textContent = cfg.RING_RATIO_NOTE;
