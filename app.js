@@ -132,6 +132,8 @@ const districtAttrs = (state, k) => ({
   // actually separates one band from the next.
   stroke: strokeFor(state, k),
   "stroke-width": cfg.STROKE_WIDTH,
+  // Harmless on a <use> (it cannot reach the shadow content, which takes it
+  // from the referenced path instead) and required on a <path>.
   "vector-effect": "non-scaling-stroke",
   "data-usps": state.usps,
   "data-k": k,
@@ -146,7 +148,17 @@ let uid = 0;
 function drawGenerated(g, defs, state) {
   state.lobes.forEach((lobe) => {
     const id = `o${uid++}`;
-    defs.appendChild(el("path", { id, d: ringPath(lobe.outline) }));
+    // vector-effect goes HERE, on the referenced path, and not on the <use>
+    // elements below -- it is a NON-inherited property, so setting it on a
+    // <use> never reaches the shadow content that actually paints. Left there,
+    // every district's stroke was scaled by its own transform AND by the
+    // viewBox, which at national scale turned 0.75 user units into 0.75 METRES:
+    // about two ten-thousandths of a pixel. The outward map had no visible
+    // district borders at all, while fill and stroke COLOUR inherited normally
+    // and made it look as though it did.
+    defs.appendChild(el("path", {
+      id, d: ringPath(lobe.outline), "vector-effect": "non-scaling-stroke",
+    }));
 
     // Clip the whole lobe group rather than intersecting each band. On a
     // concave lobe a shrunk copy can cross its own boundary -- 6% of band area
